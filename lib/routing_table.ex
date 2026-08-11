@@ -11,6 +11,7 @@ defmodule RoutingTable do
 
   def fetch_bucket(table, index) do
     table
+    |> Map.get(:kbuckets)
     |> Map.get(index)
   end
 end
