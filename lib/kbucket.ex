@@ -1,15 +1,5 @@
-defmodule KBucket do
+defmodule Exalia.KBucket do
   @k 20
-
-  defstruct [
-    :candidates
-  ]
-
-  def new() do
-    %__MODULE__{
-      candidates: []
-    }
-  end
 
   def insert(bucket, contact) do
     case Enum.find_index(bucket, contact) do
@@ -19,7 +9,7 @@ defmodule KBucket do
       index ->
         bucket
         |> List.delete_at(index)
-        |> Kernel.++()[contact]
+        |> Kernel.++([contact])
     end
   end
 

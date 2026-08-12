@@ -1,5 +1,7 @@
-defmodule RoutingTable do
+defmodule Exalia.RoutingTable do
   import Bitwise
+
+  alias Exalia.KBucket
 
   defstruct [
     :id,
@@ -17,16 +19,17 @@ defmodule RoutingTable do
     distance = xor_distance(table.id, candidate.id)
     index = bucket_index(distance)
     bucket = fetch_bucket(table, index)
-    put_bucket(table, index, bucket)
+    new_bucket = KBucket.insert(bucket, candidate)
+    put_bucket(table, index, new_bucket)
   end
 
   def fetch_bucket(table, index) do
     table
     |> Map.get(:kbuckets)
-    |> Map.get(index)
+    |> Map.get(index, [])
   end
 
-  def put_bucket(table, index, bucket) do
+  def put_bucket(%__MODULE__{} = table, index, bucket) do
     %__MODULE__{table | kbuckets: Map.put(table.kbuckets, index, bucket)}
   end
 

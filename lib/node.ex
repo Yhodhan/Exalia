@@ -1,11 +1,24 @@
-defmodule Node do
+defmodule Exalia.Node do
+  alias Exalia.RoutingTable
+
+  use GenServer
+
+  @id_size_bytes 20
 
   defstruct [
     :routing_table,
     :id
-  ] 
+  ]
 
-  use GenServer
+  def new() do
+    id = generate_id()
+    rtable = RoutingTable.new(id)
+
+    %__MODULE__{
+      routing_table: rtable,
+      id: id
+    }
+  end
 
   # -------------------
   #   GenServer calls
@@ -36,4 +49,9 @@ defmodule Node do
   # ------------------
   # Private functions
   # ------------------
+
+  defp generate_id() do
+    :crypto.strong_rand_bytes(@id_size_bytes)
+    |> :binary.decode_unsigned()
+  end
 end
