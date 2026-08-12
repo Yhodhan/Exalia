@@ -1,12 +1,23 @@
 defmodule RoutingTable do
+  import Bitwise
+
   defstruct [
+    :id,
     :kbuckets
   ]
 
-  def new() do
+  def new(own_id) do
     %__MODULE__{
-      kbuckets: %{}
+      kbuckets: %{},
+      id: own_id
     }
+  end
+
+  def insert(table, candidate) do
+    distance = xor_distance(table.id, candidate.id)
+    index = bucket_index(distance)
+    bucket = fetch_bucket(table, index)
+    put_bucket(table, index, bucket)
   end
 
   def fetch_bucket(table, index) do
@@ -14,4 +25,34 @@ defmodule RoutingTable do
     |> Map.get(:kbuckets)
     |> Map.get(index)
   end
+
+  def put_bucket(table, index, bucket) do
+    %__MODULE__{table | kbuckets: Map.put(table.kbuckets, index, bucket)}
+  end
+
+  # ------------------
+  # Private functions
+  # ------------------
+
+  defp xor_distance(a, b) do
+    a = conversion(a)
+    b = conversion(b)
+
+    bxor(a, b)
+  end
+
+  # """
+  # Obtains the first not 0 bit of the distance between two nodes
+  # """
+
+  defp bucket_index(distance) when distance > 0, do: bucket_index(distance, -1)
+  defp bucket_index(0, index), do: index
+
+  defp bucket_index(distance, index),
+    do: bucket_index(distance >>> 1, index + 1)
+
+  defp conversion(value) when is_binary(value),
+    do: :binary.decode_unsigned(value)
+
+  defp conversion(value), do: value
 end

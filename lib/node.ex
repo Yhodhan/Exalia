@@ -1,4 +1,10 @@
 defmodule Node do
+
+  defstruct [
+    :routing_table,
+    :id
+  ] 
+
   use GenServer
 
   # -------------------
