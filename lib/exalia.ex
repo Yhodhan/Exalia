@@ -1,5 +1,5 @@
 defmodule Exalia do
-  alias Exalia.Node
+  alias Exalia.KNode
 
   def new_node(),
     do: Node.new()

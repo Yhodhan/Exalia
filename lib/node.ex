@@ -1,4 +1,4 @@
-defmodule Exalia.Node do
+defmodule Exalia.KNode do
   alias Exalia.RoutingTable
 
   use GenServer
@@ -14,10 +14,12 @@ defmodule Exalia.Node do
     id = generate_id()
     rtable = RoutingTable.new(id)
 
-    %__MODULE__{
+    state = %__MODULE__{
       routing_table: rtable,
       id: id
     }
+
+    start_link(state)
   end
 
   # -------------------
@@ -27,8 +29,8 @@ defmodule Exalia.Node do
   def start_link(state \\ []),
     do: GenServer.start_link(__MODULE__, state)
 
-  def ping() do
-  end
+  def ping(pid),
+    do: GenServer.call(pid, :ping)
 
   def store() do
   end
@@ -45,6 +47,10 @@ defmodule Exalia.Node do
 
   def init(state),
     do: {:ok, state}
+
+  def handle_call(:ping, _from, state) do
+    {:reply, :pong, state}
+  end
 
   # ------------------
   # Private functions
