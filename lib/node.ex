@@ -7,7 +7,8 @@ defmodule Exalia.KNode do
 
   defstruct [
     :routing_table,
-    :id
+    :id,
+    :port
   ]
 
   def new() do
