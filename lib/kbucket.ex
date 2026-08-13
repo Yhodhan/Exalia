@@ -1,5 +1,5 @@
 defmodule Exalia.KBucket do
-  @k 20
+  @k 8 
 
   def insert(bucket, contact) do
     case Enum.find_index(bucket, contact) do

@@ -3,4 +3,7 @@ defmodule Exalia do
 
   def new_node(),
     do: KNode.new()
+
+  def ping(pid, host, port),
+    do: KNode.ping(pid, host, port)
 end
