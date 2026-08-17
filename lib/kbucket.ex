@@ -2,8 +2,9 @@ defmodule Exalia.KBucket do
   alias Exalia.Candidate
   @k 8
 
+  @spec insert(any(), any()) :: none()
   def insert(bucket, %Candidate{} = contact) do
-    case Enum.find_index(bucket, contact) do
+    case Enum.find_index(bucket, &(&1.id == contact.id)) do
       nil ->
         insert_new(bucket, contact)
 

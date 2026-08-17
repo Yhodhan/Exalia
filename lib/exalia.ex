@@ -1,17 +1,19 @@
 defmodule Exalia do
-
   alias Exalia.KNode
   alias Exalia.Config
 
   require Logger
 
   def bootstrap() do
-    {ip, port} =
-      Config.bootstrap_nodes()
-      |> List.first()
+    {:ok, pid, id} = new_node()
 
-    {:ok, pid} = new_node()
-    :pong = ping(pid, ip, port)
+    # ping initial nodes
+    Config.bootstrap_nodes()
+    |> Enum.each(fn {ip, port} -> ping(pid, ip, port) end)
+
+    # find nodes closer to Exalia
+    contacts(pid)
+    |> Enum.each(fn n -> find_nodes(pid, id, n.id) end)
 
     Logger.info("=== Succesful Bootstrapping ===")
     pid
