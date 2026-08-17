@@ -2,6 +2,7 @@ defmodule Exalia.KNode do
   alias Exalia.RoutingTable
   alias Exalia.KRPC
   alias Bencoder.Decoder
+  alias Exalia.Candidate
 
   use GenServer
   require Logger
@@ -38,6 +39,9 @@ defmodule Exalia.KNode do
   def ping(pid, host, port),
     do: GenServer.call(pid, {:ping, host, port}, 5_000)
 
+  def contacs(pid),
+    do: GenServer.call(pid, :contacts)
+
   def store() do
   end
 
@@ -56,13 +60,21 @@ defmodule Exalia.KNode do
     {:ok, %{state | socket: socket, pending: %{}}}
   end
 
+  def handle_call(:contacts, _from, state) do
+    contacts =
+      Map.values(state.routing_table.kbuckets)
+      |> List.flatten()
+
+    {:reply, contacts, state}
+  end
+
   def handle_call({:ping, host, port}, from, state) do
     tid = transaction_id()
 
     {:ok, msg} = KRPC.ping(state.id, tid)
     {:ok, ip} = :inet.getaddr(String.to_charlist(host), :inet)
 
-    result = :gen_udp.send(state.socket, ip, port, msg)
+    :gen_udp.send(state.socket, ip, port, msg)
 
     Logger.info("=== Package sent ===")
 
@@ -70,25 +82,23 @@ defmodule Exalia.KNode do
     {:noreply, %{state | pending: pending}}
   end
 
-  def handle_info({:udp, _socket, _ip, _port, data}, state) do
+  def handle_info({:udp, _socket, ip, port, data}, state) do
     Logger.info("=== Response received ===")
 
     with {:ok, data} <- Decoder.decode(data),
          {:ok, tid, response} <- analyze_response(data),
          {:ok, from, pending} <- fetch_tx(tid, state) do
-      state = handle_response(state, from, response)
-      #        GenServer.reply(from, response)
-      #        {:noreply, %{state | pending: pending}}
+      {response, state} = handle_response(state, response, {ip, port})
+      GenServer.reply(from, response)
+      {:noreply, %{state | pending: pending}}
     else
       _ ->
         {:noreply, state}
     end
   end
 
-  def handle_response(state, from, response) do
-    res = response["r"]
-
-    case res do
+  def handle_response(state, response, address) do
+    case response["r"] do
       %{"id" => id, "token" => token, "nodes" => nodes} ->
         handle_get_peers(state, id, token, nodes)
 
@@ -96,14 +106,20 @@ defmodule Exalia.KNode do
         handle_find_node(state, id, nodes)
 
       %{"id" => id} ->
-        handle_ping(state, id)
+        handle_ping(state, id, address)
+
+      _ ->
+        {:unknown_command, state}
     end
   end
 
-  def handle_ping(state, id) do
+  def handle_ping(state, raw_id, {ip, port}) do
     # store the node in the routing table
-    table = RoutingTable.insert(state.routing_table, id)
-    %{state | table: table}
+    id = :binary.decode_unsigned(raw_id)
+    candidate = Candidate.new(id, ip, port)
+    table = RoutingTable.insert(state.routing_table, candidate)
+
+    {:pong, %{state | routing_table: table}}
   end
 
   def handle_find_node(state, id, nodes) do

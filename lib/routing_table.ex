@@ -2,6 +2,7 @@ defmodule Exalia.RoutingTable do
   import Bitwise
 
   alias Exalia.KBucket
+  alias Exalia.Candidate
 
   defstruct [
     :id,
@@ -15,7 +16,7 @@ defmodule Exalia.RoutingTable do
     }
   end
 
-  def insert(table, candidate) do
+  def insert(table, %Candidate{} = candidate) do
     distance = xor_distance(table.id, candidate.id)
     index = bucket_index(distance)
     bucket = fetch_bucket(table, index)

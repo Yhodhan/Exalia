@@ -6,4 +6,8 @@ defmodule Exalia do
 
   def ping(pid, host, port),
     do: KNode.ping(pid, host, port)
+
+  def contacts(pid),
+    do: KNode.contacs(pid)
+
 end
