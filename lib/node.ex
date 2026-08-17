@@ -19,7 +19,7 @@ defmodule Exalia.KNode do
 
   def new() do
     id = generate_id()
-    rtable = RoutingTable.new(id)
+    rtabl = RoutingTable.new(id)
 
     state = %__MODULE__{
       routing_table: rtable,
@@ -42,14 +42,17 @@ defmodule Exalia.KNode do
   def contacs(pid),
     do: GenServer.call(pid, :contacts)
 
-  def store() do
-  end
+  def find_node(pid, query_id, target),
+    do: GenServer.call(pid, {:find_node, query_id, target})
 
-  def find_node() do
-  end
+  def get_peers(pid),
+    do: GenServer.call(pid, :get_peers)
 
-  def find_value() do
-  end
+  def get_node_id(pid),
+    do: GenServer.call(pid, :node_id)
+
+  def get_routing_table(pid),
+    do: GenServer.call(pid, :routing_table)
 
   # ----------------------
   #  GenServer functions
@@ -71,16 +74,47 @@ defmodule Exalia.KNode do
   def handle_call({:ping, host, port}, from, state) do
     tid = transaction_id()
 
-    {:ok, msg} = KRPC.ping(state.id, tid)
+    {:ok, msg} = KRPC.ping(tid, state.id)
     {:ok, ip} = :inet.getaddr(String.to_charlist(host), :inet)
 
     :gen_udp.send(state.socket, ip, port, msg)
 
-    Logger.info("=== Package sent ===")
+    Logger.info("=== Ping sent ===")
 
     pending = Map.put(state.pending, tid, from)
     {:noreply, %{state | pending: pending}}
   end
+
+  def handle_call({:find_node, query_id, target}, from, state) do
+    tid = transaction_id()
+
+    {:ok, msg} = KRPC.find_node(tid, query_id, target)
+    candidate = get_candidate(state.routing_table, target)
+
+    :gen_udp.send(state.socket, candidate.ip, candidate.port, msg)
+
+    Logger.info("=== Find Node Request ===")
+
+    pending = Map.put(state.pending, tid, from)
+    {:noreply, %{state | pending: pending}}
+  end
+
+  def handle_call(:get_peers, _from, _state) do
+    nil
+  end
+
+  # ---------------------------
+  #        Getter Functions
+  # ---------------------------
+  def handle_call(:routing_table, _from, state),
+    do: {:reply, state.routing_table, state}
+
+  def handle_call(:node_id, _from, state),
+    do: {:reply, state.id, state}
+
+  # ---------------------------
+  #    Handle Port connection 
+  # ---------------------------
 
   def handle_info({:udp, _socket, ip, port, data}, state) do
     Logger.info("=== Response received ===")
@@ -114,6 +148,7 @@ defmodule Exalia.KNode do
   end
 
   def handle_ping(state, raw_id, {ip, port}) do
+    Logger.info("=== Ping received ===")
     # store the node in the routing table
     id = :binary.decode_unsigned(raw_id)
     candidate = Candidate.new(id, ip, port)
@@ -123,6 +158,8 @@ defmodule Exalia.KNode do
   end
 
   def handle_find_node(state, id, nodes) do
+    Logger.info("=== Find Nodes received ===")
+    parse_nodes(nodes)
   end
 
   def handle_get_peers(state, id, token, values) when is_list(values) do
@@ -137,6 +174,10 @@ defmodule Exalia.KNode do
   # ------------------
   # Private functions
   # ------------------
+  
+  defp parse_nodes(nodes) do
+    
+  end
 
   defp generate_id() do
     :crypto.strong_rand_bytes(@id_size_bytes)
@@ -145,6 +186,9 @@ defmodule Exalia.KNode do
 
   defp transaction_id(),
     do: :crypto.strong_rand_bytes(2)
+
+  defp get_candidate(table, id),
+    do: RoutingTable.get_candidate(table, id)
 
   defp analyze_response(data) do
     case data do
@@ -158,11 +202,8 @@ defmodule Exalia.KNode do
 
   defp fetch_tx(tid, state) do
     case Map.pop(state.pending, tid) do
-      {nil, _pending} ->
-        {:noreply, state}
-
-      {from, pending} ->
-        {:ok, from, pending}
+      {nil, _pending} -> :error
+      {from, pending} -> {:ok, from, pending}
     end
   end
 end

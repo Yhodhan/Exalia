@@ -17,9 +17,7 @@ defmodule Exalia.RoutingTable do
   end
 
   def insert(table, %Candidate{} = candidate) do
-    distance = xor_distance(table.id, candidate.id)
-    index = bucket_index(distance)
-    bucket = fetch_bucket(table, index)
+    {bucket, index} = get_bucket(table, candidate.id)
     new_bucket = KBucket.insert(bucket, candidate)
     put_bucket(table, index, new_bucket)
   end
@@ -34,6 +32,13 @@ defmodule Exalia.RoutingTable do
     %__MODULE__{table | kbuckets: Map.put(table.kbuckets, index, bucket)}
   end
 
+  def get_candidate(table, id) do
+    {bucket, _index} = get_bucket(table, id)
+
+    bucket
+    |> Enum.find(fn c -> c.id == id end)
+  end
+
   # ------------------
   # Private functions
   # ------------------
@@ -43,6 +48,13 @@ defmodule Exalia.RoutingTable do
     b = conversion(b)
 
     bxor(a, b)
+  end
+
+  defp get_bucket(table, id) do
+    distance = xor_distance(table.id, id)
+    index = bucket_index(distance)
+
+    {fetch_bucket(table, index), index}
   end
 
   # """
