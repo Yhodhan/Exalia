@@ -19,7 +19,7 @@ defmodule Exalia.KNode do
 
   def new() do
     id = generate_id()
-    rtabl = RoutingTable.new(id)
+    rtable = RoutingTable.new(id)
 
     state = %__MODULE__{
       routing_table: rtable,
@@ -136,8 +136,8 @@ defmodule Exalia.KNode do
       %{"id" => id, "token" => token, "nodes" => nodes} ->
         handle_get_peers(state, id, token, nodes)
 
-      %{"id" => id, "nodes" => nodes} ->
-        handle_find_node(state, id, nodes)
+      %{"id" => _id, "nodes" => nodes} ->
+        handle_find_node(state, nodes)
 
       %{"id" => id} ->
         handle_ping(state, id, address)
@@ -157,9 +157,11 @@ defmodule Exalia.KNode do
     {:pong, %{state | routing_table: table}}
   end
 
-  def handle_find_node(state, id, nodes) do
+  def handle_find_node(state, nodes) do
     Logger.info("=== Find Nodes received ===")
-    parse_nodes(nodes)
+    nodes = parse_nodes(nodes)
+
+    {nodes, state}
   end
 
   def handle_get_peers(state, id, token, values) when is_list(values) do
@@ -174,9 +176,14 @@ defmodule Exalia.KNode do
   # ------------------
   # Private functions
   # ------------------
-  
-  defp parse_nodes(nodes) do
-    
+
+  defp parse_nodes(<<>>), do: []
+
+  defp parse_nodes(<<id::binary-size(20), a, b, c, d, port::binary-size(2), rest::binary>>) do
+    id = :binary.decode_unsigned(id)
+    ip = {a, b, c, d}
+    candidate = Candidate.new(id, ip, port)
+    [candidate] ++ parse_nodes(rest)
   end
 
   defp generate_id() do

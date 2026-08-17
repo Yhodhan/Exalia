@@ -1,5 +1,21 @@
 defmodule Exalia do
+
   alias Exalia.KNode
+  alias Exalia.Config
+
+  require Logger
+
+  def bootstrap() do
+    {ip, port} =
+      Config.bootstrap_nodes()
+      |> List.first()
+
+    {:ok, pid} = new_node()
+    :pong = ping(pid, ip, port)
+
+    Logger.info("=== Succesful Bootstrapping ===")
+    pid
+  end
 
   def new_node(),
     do: KNode.new()
