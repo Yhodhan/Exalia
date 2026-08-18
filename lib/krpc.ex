@@ -10,11 +10,24 @@ defmodule Exalia.KRPC do
     Encoder.encode(q)
   end
 
-  def find_node(tid, query_id, target) do
-    hex = generate_binary_id(query_id)
-    hex_t = generate_binary_id(target)
+  def find_node(tid, id, target) do
+    id = generate_binary_id(id)
+    t = generate_binary_id(target)
 
-    q = %{"t" => tid, "y" => "q", "q" => "find_node", "a" => %{"id" => hex, "target" => hex_t}}
+    q = %{"t" => tid, "y" => "q", "q" => "find_node", "a" => %{"id" => id, "target" => t}}
+    Encoder.encode(q)
+  end
+
+  def get_peers(tid, id, infohash) do
+    id = generate_binary_id(id)
+
+    q = %{
+      "t" => tid,
+      "y" => "q",
+      "q" => "get_peers",
+      "a" => %{"id" => id, "info_hash" => infohash}
+    }
+
     Encoder.encode(q)
   end
 

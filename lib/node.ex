@@ -15,6 +15,7 @@ defmodule Exalia.KNode do
     :id,
     :port,
     :socket,
+    :token,
     pending: %{}
   ]
 
@@ -38,6 +39,10 @@ defmodule Exalia.KNode do
   def start_link(state \\ []),
     do: GenServer.start_link(__MODULE__, state)
 
+  # -----------------
+  #   Main API calls
+  # -----------------
+
   def ping(pid, host, port) do
     try do
       GenServer.call(pid, {:ping, host, port}, @time_out)
@@ -45,9 +50,6 @@ defmodule Exalia.KNode do
       :exit, {:timeout, _} -> {:error, :timeout}
     end
   end
-
-  def contacs(pid),
-    do: GenServer.call(pid, :contacts)
 
   def find_node(pid, contact, target) do
     try do
@@ -57,8 +59,20 @@ defmodule Exalia.KNode do
     end
   end
 
-  def get_peers(pid),
-    do: GenServer.call(pid, :get_peers)
+  def get_peers(pid, contact, infohash) do
+    try do
+      GenServer.call(pid, {:get_peers, contact, infohash}, @time_out)
+    catch
+      :exit, {:timeout, _} -> {:error, :timeout}
+    end
+  end
+
+  # ------------------
+  #  Helper functions
+  # ------------------
+
+  def contacs(pid),
+    do: GenServer.call(pid, :contacts)
 
   def get_node_id(pid),
     do: GenServer.call(pid, :node_id)
@@ -96,7 +110,7 @@ defmodule Exalia.KNode do
 
     Process.send_after(self(), {:request_timeout, tid}, @time_out)
 
-    Logger.info("=== Ping sent ===")
+    Logger.info("=== Ping Request sent ===")
 
     pending = Map.put(state.pending, tid, from)
     {:noreply, %{state | pending: pending}}
@@ -112,14 +126,23 @@ defmodule Exalia.KNode do
 
     :gen_udp.send(state.socket, contact.ip, contact.port, msg)
 
-    Logger.info("=== Find Node Request ===")
+    Logger.info("=== Find Node Request Sent ===")
 
     pending = Map.put(state.pending, tid, from)
     {:noreply, %{state | pending: pending}}
   end
 
-  def handle_call(:get_peers, _from, _state) do
-    nil
+  def handle_call({:get_peers, contact, infohash}, from, state) do
+    tid = transaction_id()
+
+    {:ok, msg} = KRPC.get_peers(tid, state.id, infohash)
+
+    :gen_udp.send(state.socket, contact.ip, contact.port, msg)
+
+    Logger.info("=== Get Peers Request Sent ===")
+
+    pending = Map.put(state.pending, tid, from)
+    {:noreply, %{state | pending: pending}}
   end
 
   # ---------------------------
@@ -167,8 +190,11 @@ defmodule Exalia.KNode do
 
   def handle_response(state, response, address) do
     case response["r"] do
-      %{"id" => id, "token" => token, "nodes" => nodes} ->
-        handle_get_peers(state, id, token, nodes)
+      %{"id" => _id, "token" => token, "nodes" => nodes} ->
+        handle_get_peers_nodes(state, token, nodes)
+
+      %{"id" => _id, "token" => token, "values" => values} ->
+        handle_get_peers_values(state, token, values)
 
       %{"id" => _id, "nodes" => nodes} ->
         handle_find_node(state, nodes)
@@ -193,24 +219,21 @@ defmodule Exalia.KNode do
 
   def handle_find_node(state, nodes) do
     Logger.info("=== Find Nodes received ===")
-
-    decoded_nodes =
-      parse_nodes(nodes)
-      |> Enum.uniq_by(& &1.id)
-
-    table =
-      decoded_nodes
-      |> Enum.reduce(state.routing_table, fn n, table ->
-        RoutingTable.insert(table, n)
-      end)
+    {decoded_nodes, table} = fill_routing_table(state, nodes)
 
     {decoded_nodes, %{state | routing_table: table}}
   end
 
-  def handle_get_peers(_state, _id, _token, values) when is_list(values) do
+  def handle_get_peers_nodes(state, token, nodes) do
+    {decoded_nodes, table} = fill_routing_table(state, nodes)
+
+    {{:nodes, decoded_nodes}, %{state | routing_table: table, token: token}}
   end
 
-  def handle_get_peers(_state, _id, _token, _nodes) do
+  def handle_get_peers_values(state, token, values) do
+    peers = decode_peers(values)
+
+    {{:peers, peers}, %{state | token: token}}
   end
 
   def handle_announce_peers() do
@@ -229,6 +252,15 @@ defmodule Exalia.KNode do
     candidate = Candidate.new(id, ip, port)
 
     [candidate] ++ parse_nodes(rest)
+  end
+
+  defp decode_peers(<<>>),
+    do: []
+
+  defp decode_peers(<<a, b, c, d, port::16, rest::binary>>) do
+    ip = {a, b, c, d}
+    peer = {ip, port}
+    [peer] ++ decode_peers(rest)
   end
 
   defp generate_id() do
@@ -254,5 +286,17 @@ defmodule Exalia.KNode do
       {nil, _pending} -> :error
       {from, pending} -> {:ok, from, pending}
     end
+  end
+
+  def fill_routing_table(state, nodes) do
+    decoded_nodes =
+      parse_nodes(nodes)
+      |> Enum.uniq_by(& &1.id)
+
+    {decoded_nodes,
+     decoded_nodes
+     |> Enum.reduce(state.routing_table, fn n, table ->
+       RoutingTable.insert(table, n)
+     end)}
   end
 end

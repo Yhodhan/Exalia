@@ -30,8 +30,16 @@ defmodule Exalia do
     {:ok, pid}
   end
 
-  def new_node(),
-    do: KNode.new()
+  def get_peers(pid, infohash) do
+    # 1 - get the contacts
+    # 2 - loop on them calling get_peers(p, c, i)
+    # 3 - for those that return :peers, store them. If not call lookup iteratively
+    # 4 - join all answers 
+  end
+
+  # -----------------
+  #   Main API calls
+  # -----------------
 
   def ping(pid, host, port),
     do: KNode.ping(pid, host, port)
@@ -39,7 +47,17 @@ defmodule Exalia do
   def find_nodes(pid, contact, target),
     do: KNode.find_node(pid, contact, target)
 
-  def contacts(pid),
+  def get_peers(pid, contact, infohash),
+    do: KNode.get_peers(pid, contact, infohash)
+
+  # ------------------
+  #  Helper functions
+  # ------------------
+
+  def new_node(),
+    do: KNode.new()
+
+  def get_contacts(pid),
     do: KNode.contacs(pid)
 
   def node_id(pid),
