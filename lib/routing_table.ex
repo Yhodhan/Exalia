@@ -32,18 +32,11 @@ defmodule Exalia.RoutingTable do
     %__MODULE__{table | kbuckets: Map.put(table.kbuckets, index, bucket)}
   end
 
-  def get_candidate(table, id) do
-    {bucket, _index} = get_bucket(table, id)
-
-    bucket
-    |> Enum.find(fn c -> c.id == id end)
-  end
-
   # ------------------
   # Private functions
   # ------------------
 
-  defp xor_distance(a, b) do
+  def xor_distance(a, b) do
     a = conversion(a)
     b = conversion(b)
 

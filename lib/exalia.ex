@@ -1,22 +1,31 @@
 defmodule Exalia do
   alias Exalia.KNode
   alias Exalia.Config
+  alias Exalia.RoutingTable
 
   require Logger
+
+  @alpha 3
+  @k 8
 
   def bootstrap() do
     {:ok, pid, id} = new_node()
 
     # ping initial nodes
     Config.bootstrap_nodes()
-    |> Enum.each(fn {ip, port} -> ping(pid, ip, port) end)
+    |> Task.async_stream(
+      fn {ip, port} -> ping(pid, ip, port) end,
+      timeout: 6000,
+      on_timeout: :kill_task
+    )
+    |> Enum.to_list()
 
     # find nodes closer to Exalia
-    contacts(pid)
-    |> Enum.each(fn n -> find_nodes(pid, id, n.id) end)
+    iterative_lookup(pid, id)
 
     Logger.info("=== Succesful Bootstrapping ===")
-    pid
+
+    {:ok, pid}
   end
 
   def new_node(),
@@ -25,8 +34,8 @@ defmodule Exalia do
   def ping(pid, host, port),
     do: KNode.ping(pid, host, port)
 
-  def find_nodes(pid, id, target),
-    do: KNode.find_node(pid, id, target)
+  def find_nodes(pid, contact, target),
+    do: KNode.find_node(pid, contact, target)
 
   def contacts(pid),
     do: KNode.contacs(pid)
@@ -36,4 +45,53 @@ defmodule Exalia do
 
   def routing_table(pid),
     do: KNode.get_routing_table(pid)
+
+  # -------------------
+  #  Private functions
+  # -------------------
+
+  defp closest_nodes(pid, target, alpha) do
+    routing_table(pid)
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
+    |> Enum.take(alpha)
+  end
+
+  def iterative_lookup(pid, target) do
+    initial_nodes = closest_nodes(pid, target, @alpha)
+    do_lookup(pid, target, initial_nodes, _queried = MapSet.new(), _best = [], _round = 8)
+  end
+
+  def do_lookup(_pid, _target, _to_query, _queried, best, 0), do: best
+
+  def do_lookup(pid, target, to_query, queried, best, rounds) do
+    new_candidates =
+      to_query
+      |> Task.async_stream(
+        fn n -> find_nodes(pid, n, target) end,
+        timeout: 6000,
+        on_timeout: :kill_task
+      )
+      |> Enum.flat_map(fn
+        {:ok, candidates} when is_list(candidates) -> candidates
+        _ -> []
+      end)
+
+    queried = Enum.reduce(to_query, queried, fn n, acc -> MapSet.put(acc, n.id) end)
+
+    best =
+      (best ++ new_candidates)
+      |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
+      |> Enum.take(@k)
+
+    next_to_query =
+      best
+      |> Enum.reject(fn c -> MapSet.member?(queried, c.id) end)
+      |> Enum.take(@alpha)
+
+    if Enum.empty?(next_to_query),
+      do: best,
+      else: do_lookup(pid, target, next_to_query, queried, best, rounds - 1)
+  end
 end

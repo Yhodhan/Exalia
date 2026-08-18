@@ -49,8 +49,8 @@ defmodule Exalia.KNode do
   def contacs(pid),
     do: GenServer.call(pid, :contacts)
 
-  def find_node(pid, query_id, target),
-    do: GenServer.call(pid, {:find_node, query_id, target})
+  def find_node(pid, contact, target),
+    do: GenServer.call(pid, {:find_node, contact, target})
 
   def get_peers(pid),
     do: GenServer.call(pid, :get_peers)
@@ -100,13 +100,12 @@ defmodule Exalia.KNode do
   # -----------------
   #     FIND NODE 
   # ----------------- 
-  def handle_call({:find_node, query_id, target}, from, state) do
+  def handle_call({:find_node, contact, target}, from, state) do
     tid = transaction_id()
 
-    {:ok, msg} = KRPC.find_node(tid, query_id, target)
-    candidate = get_candidate(state.routing_table, target)
+    {:ok, msg} = KRPC.find_node(tid, state.id, target)
 
-    :gen_udp.send(state.socket, candidate.ip, candidate.port, msg)
+    :gen_udp.send(state.socket, contact.ip, contact.port, msg)
 
     Logger.info("=== Find Node Request ===")
 
@@ -190,19 +189,23 @@ defmodule Exalia.KNode do
   def handle_find_node(state, nodes) do
     Logger.info("=== Find Nodes received ===")
 
-    table =
+    decoded_nodes =
       parse_nodes(nodes)
+      |> Enum.uniq_by(& &1.id)
+
+    table =
+      decoded_nodes
       |> Enum.reduce(state.routing_table, fn n, table ->
-        RoutingTable.insert(state.routing_table, n)
+        RoutingTable.insert(table, n)
       end)
 
-    {nodes, %{state | routing_table: table}}
+    {decoded_nodes, %{state | routing_table: table}}
   end
 
-  def handle_get_peers(state, id, token, values) when is_list(values) do
+  def handle_get_peers(_state, _id, _token, values) when is_list(values) do
   end
 
-  def handle_get_peers(state, id, token, nodes) do
+  def handle_get_peers(_state, _id, _token, _nodes) do
   end
 
   def handle_announce_peers() do
@@ -224,15 +227,12 @@ defmodule Exalia.KNode do
   end
 
   defp generate_id() do
-    :crypto.strong_rand_bytes(@id_size_bytes)
-    |> :binary.decode_unsigned()
+    bytes = :crypto.strong_rand_bytes(@id_size_bytes)
+    :binary.decode_unsigned(bytes)
   end
 
   defp transaction_id(),
     do: :crypto.strong_rand_bytes(2)
-
-  defp get_candidate(table, id),
-    do: RoutingTable.get_candidate(table, id)
 
   defp analyze_response(data) do
     case data do
