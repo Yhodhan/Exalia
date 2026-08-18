@@ -49,8 +49,13 @@ defmodule Exalia.KNode do
   def contacs(pid),
     do: GenServer.call(pid, :contacts)
 
-  def find_node(pid, contact, target),
-    do: GenServer.call(pid, {:find_node, contact, target})
+  def find_node(pid, contact, target) do
+    try do
+      GenServer.call(pid, {:find_node, contact, target}, @time_out)
+    catch
+      :exit, {:timeout, _} -> {:error, :timeout}
+    end
+  end
 
   def get_peers(pid),
     do: GenServer.call(pid, :get_peers)

@@ -18,8 +18,14 @@ defmodule Exalia.RoutingTable do
 
   def insert(table, %Candidate{} = candidate) do
     {bucket, index} = get_bucket(table, candidate.id)
-    new_bucket = KBucket.insert(bucket, candidate)
-    put_bucket(table, index, new_bucket)
+
+    case KBucket.insert(bucket, candidate) do
+      {:full, _bucket, _candidate} ->
+        table
+
+      new_bucket ->
+        put_bucket(table, index, new_bucket)
+    end
   end
 
   def fetch_bucket(table, index) do

@@ -21,9 +21,11 @@ defmodule Exalia do
     |> Enum.to_list()
 
     # find nodes closer to Exalia
+    Logger.info("=== INIT ITERATIVE LOOKUP ===")
+
     iterative_lookup(pid, id)
 
-    Logger.info("=== Succesful Bootstrapping ===")
+    Logger.info("=== SUCCESSFUL BOOTSTRAPPING ===")
 
     {:ok, pid}
   end
@@ -51,7 +53,7 @@ defmodule Exalia do
   # -------------------
 
   defp closest_nodes(pid, target, alpha) do
-    routing_table(pid)
+    routing_table(pid).kbuckets
     |> Map.values()
     |> List.flatten()
     |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
