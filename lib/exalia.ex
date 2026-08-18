@@ -31,10 +31,45 @@ defmodule Exalia do
   end
 
   def get_peers(pid, infohash) do
+    # 4 - join all answers 
+    contacts = get_contacts(pid)
+    spread_infohash(pid, infohash, contacts, _peers = MapSet.new())
+  end
+
+  def spread_infohash(pid, infohash, to_query, peers) do
     # 1 - get the contacts
     # 2 - loop on them calling get_peers(p, c, i)
-    # 3 - for those that return :peers, store them. If not call lookup iteratively
-    # 4 - join all answers 
+    responses =
+      to_query
+      |> Task.async_stream(
+        fn c -> get_peers(pid, c, infohash) end,
+        timeout: 6000,
+        on_timeout: :kill_task
+      )
+      |> Enum.flat_map(fn
+        {:ok, candidates} when is_list(candidates) -> candidates
+        _ -> []
+      end)
+
+    # 3 - for those that return :peers, store them in return value
+    peers =
+      Enum.reduce(responses, peers, fn {type, val}, acc ->
+        if type == :peers,
+          do: MapSet.union(acc, MapSet.new(val)),
+          else: acc
+      end)
+
+    # 4 - for those that return :nodes, store them in pending 
+    pending =
+      Enum.reduce(responses, [], fn {type, val}, acc ->
+        if type == :nodes,
+          do: acc ++ val,
+          else: acc
+      end)
+
+    if Enum.empty?(pending),
+      do: peers,
+      else: spread_infohash(pid, infohash, pending, peers)
   end
 
   # -----------------

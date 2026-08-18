@@ -225,12 +225,14 @@ defmodule Exalia.KNode do
   end
 
   def handle_get_peers_nodes(state, token, nodes) do
+    Logger.info("=== Get Peers Received: Nodes ===")
     {decoded_nodes, table} = fill_routing_table(state, nodes)
 
     {{:nodes, decoded_nodes}, %{state | routing_table: table, token: token}}
   end
 
   def handle_get_peers_values(state, token, values) do
+    Logger.info("=== Get Peers Received: Peers ===")
     peers = decode_peers(values)
 
     {{:peers, peers}, %{state | token: token}}
