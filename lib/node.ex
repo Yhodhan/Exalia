@@ -241,8 +241,7 @@ defmodule Exalia.KNode do
 
   def handle_get_peers_values(state, token, values) do
     Logger.info("=== Get Peers Received: Peers ===")
-
-    peers = Enum.map(values, fn v -> decode_peers(values) end)
+    peers = Enum.map(values, fn v -> decode_peer(v) end)
 
     {{:peers, peers}, %{state | token: token}}
   end
@@ -254,21 +253,36 @@ defmodule Exalia.KNode do
   # Private functions
   # ------------------
 
-  defp parse_nodes(<<id::binary-size(20), a, b, c, d, port::binary-size(2)>>) do
+  defp parse_nodes(bytes) do
+    case bytes do
+      <<>> ->
+        []
+
+      <<id::binary-size(20), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, a, b, c, d,
+        port::binary-size(2), rest::binary>> ->
+        build_candidate(id, {a, b, c, d}, port) ++ parse_nodes(rest)
+
+      <<id::binary-size(20), a, b, c, d, port::binary-size(2), rest::binary>> ->
+        build_candidate(id, {a, b, c, d}, port) ++ parse_nodes(rest)
+
+      leftover ->
+        Logger.warning(
+          "=== Unparseable trailing node bytes (#{byte_size(leftover)} bytes), dropping ==="
+        )
+
+        []
+    end
+  end
+
+  defp build_candidate(id, ip, port) do
     id = :binary.decode_unsigned(id)
-    ip = {a, b, c, d}
     port = :binary.decode_unsigned(port)
-    Candidate.new(id, ip, port)
+    candidate = Candidate.new(id, ip, port)
+    [candidate]
   end
 
-  defp decode_peers(<<>>),
-    do: []
-
-  defp decode_peers(<<a, b, c, d, port::16, rest::binary>>) do
-    ip = {a, b, c, d}
-    peer = {ip, port}
-    [peer] ++ decode_peers(rest)
-  end
+  defp decode_peer(<<a, b, c, d, port::16>>),
+    do: {{a, b, c, d}, port}
 
   defp generate_id() do
     bytes = :crypto.strong_rand_bytes(@id_size_bytes)
