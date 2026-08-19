@@ -47,24 +47,22 @@ defmodule Exalia do
         on_timeout: :kill_task
       )
       |> Enum.flat_map(fn
-        {:ok, candidates} when is_list(candidates) -> candidates
+        {:ok, result} -> [result]
         _ -> []
       end)
 
     # 3 - for those that return :peers, store them in return value
     peers =
-      Enum.reduce(responses, peers, fn {type, val}, acc ->
-        if type == :peers,
-          do: MapSet.union(acc, MapSet.new(val)),
-          else: acc
+      Enum.reduce(responses, peers, fn
+        {:peers, val}, acc -> MapSet.union(acc, MapSet.new(val))
+        _, acc -> acc
       end)
 
     # 4 - for those that return :nodes, store them in pending 
     pending =
-      Enum.reduce(responses, [], fn {type, val}, acc ->
-        if type == :nodes,
-          do: acc ++ val,
-          else: acc
+      Enum.reduce(responses, [], fn
+        {:nodes, val}, acc -> acc ++ val
+        _, acc -> acc
       end)
 
     if Enum.empty?(pending),

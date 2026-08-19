@@ -160,8 +160,16 @@ defmodule Exalia.KNode do
 
   def handle_info({:udp, _socket, ip, port, data}, state) do
     Logger.info("=== Response received ===")
+    IO.inspect(data, label: "response")
 
-    with {:ok, data} <- Decoder.decode(data),
+    result =
+      try do
+        Decoder.decode(data)
+      rescue
+        _ -> :error
+      end
+
+    with {:ok, data} <- result,
          {:ok, tid, response} <- analyze_response(data),
          {:ok, from, pending} <- fetch_tx(tid, state) do
       {response, state} = handle_response(state, response, {ip, port})
@@ -233,7 +241,8 @@ defmodule Exalia.KNode do
 
   def handle_get_peers_values(state, token, values) do
     Logger.info("=== Get Peers Received: Peers ===")
-    peers = decode_peers(values)
+
+    peers = Enum.map(values, fn v -> decode_peers(values) end)
 
     {{:peers, peers}, %{state | token: token}}
   end
@@ -245,15 +254,11 @@ defmodule Exalia.KNode do
   # Private functions
   # ------------------
 
-  defp parse_nodes(<<>>), do: []
-
-  defp parse_nodes(<<id::binary-size(20), a, b, c, d, port::binary-size(2), rest::binary>>) do
+  defp parse_nodes(<<id::binary-size(20), a, b, c, d, port::binary-size(2)>>) do
     id = :binary.decode_unsigned(id)
     ip = {a, b, c, d}
     port = :binary.decode_unsigned(port)
-    candidate = Candidate.new(id, ip, port)
-
-    [candidate] ++ parse_nodes(rest)
+    Candidate.new(id, ip, port)
   end
 
   defp decode_peers(<<>>),
@@ -297,6 +302,7 @@ defmodule Exalia.KNode do
 
     {decoded_nodes,
      decoded_nodes
+     |> Enum.reject(&(&1.id == state.id))
      |> Enum.reduce(state.routing_table, fn n, table ->
        RoutingTable.insert(table, n)
      end)}
