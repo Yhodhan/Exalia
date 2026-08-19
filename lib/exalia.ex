@@ -5,7 +5,7 @@ defmodule Exalia do
 
   require Logger
 
-  @alpha 3
+  @alpha 5
   @k 8
 
   def bootstrap() do
@@ -15,7 +15,7 @@ defmodule Exalia do
     Config.bootstrap_nodes()
     |> Task.async_stream(
       fn {ip, port} -> ping(pid, ip, port) end,
-      timeout: 6000,
+      timeout: 2000,
       on_timeout: :kill_task
     )
     |> Enum.to_list()
@@ -27,29 +27,42 @@ defmodule Exalia do
 
     Logger.info("=== SUCCESSFUL BOOTSTRAPPING ===")
 
-    {:ok, pid}
+    {:ok, pid, id}
   end
 
   def get_peers(pid, infohash) do
     # 4 - join all answers 
     contacts = get_contacts(pid)
-    spread_infohash(pid, infohash, contacts, _peers = MapSet.new())
+
+    spread_infohash(
+      pid,
+      infohash,
+      contacts,
+      MapSet.new(),
+      MapSet.new(),
+      8
+    )
   end
 
-  def spread_infohash(pid, infohash, to_query, peers) do
+  def spread_infohash(_pid, _infohash, _to_query, _queried, peers, 0),
+    do: peers
+
+  def spread_infohash(pid, infohash, to_query, queried, peers, rounds) do
     # 1 - get the contacts
     # 2 - loop on them calling get_peers(p, c, i)
     responses =
       to_query
       |> Task.async_stream(
         fn c -> get_peers(pid, c, infohash) end,
-        timeout: 6000,
+        timeout: 2000,
         on_timeout: :kill_task
       )
       |> Enum.flat_map(fn
         {:ok, result} -> [result]
         _ -> []
       end)
+
+    queried = Enum.reduce(to_query, queried, fn c, acc -> MapSet.put(acc, c.id) end)
 
     # 3 - for those that return :peers, store them in return value
     peers =
@@ -58,16 +71,19 @@ defmodule Exalia do
         _, acc -> acc
       end)
 
-    # 4 - for those that return :nodes, store them in pending 
+    # 4 - for those that return :nodes, store them in pending
+    # 5 - rejec those already asked
     pending =
       Enum.reduce(responses, [], fn
         {:nodes, val}, acc -> acc ++ val
         _, acc -> acc
       end)
+      |> Enum.uniq_by(& &1.id)
+      |> Enum.reject(&MapSet.member?(queried, &1.id))
 
-    if Enum.empty?(pending),
+    if MapSet.size(peers) > 4 or Enum.empty?(pending),
       do: peers,
-      else: spread_infohash(pid, infohash, pending, peers)
+      else: spread_infohash(pid, infohash, pending, queried, peers, rounds - 1)
   end
 
   # -----------------
@@ -123,7 +139,7 @@ defmodule Exalia do
       to_query
       |> Task.async_stream(
         fn n -> find_nodes(pid, n, target) end,
-        timeout: 6000,
+        timeout: 2000,
         on_timeout: :kill_task
       )
       |> Enum.flat_map(fn

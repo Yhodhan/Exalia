@@ -8,7 +8,7 @@ defmodule Exalia.KNode do
   require Logger
 
   @id_size_bytes 20
-  @time_out 5_000
+  @time_out 1_000
 
   defstruct [
     :routing_table,
@@ -160,7 +160,6 @@ defmodule Exalia.KNode do
 
   def handle_info({:udp, _socket, ip, port, data}, state) do
     Logger.info("=== Response received ===")
-    IO.inspect(data, label: "response")
 
     result =
       try do
