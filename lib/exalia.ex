@@ -21,69 +21,13 @@ defmodule Exalia do
     |> Enum.to_list()
 
     # find nodes closer to Exalia
-    Logger.info("=== INIT ITERATIVE LOOKUP ===")
+    Logger.info("=== INIT LOOKUP ===")
 
-    iterative_lookup(pid, id)
+    lookup(pid, id)
 
     Logger.info("=== SUCCESSFUL BOOTSTRAPPING ===")
 
     {:ok, pid, id}
-  end
-
-  def get_peers(pid, infohash) do
-    # 4 - join all answers 
-    contacts = get_contacts(pid)
-
-    spread_infohash(
-      pid,
-      infohash,
-      contacts,
-      MapSet.new(),
-      MapSet.new(),
-      8
-    )
-  end
-
-  def spread_infohash(_pid, _infohash, _to_query, _queried, peers, 0),
-    do: peers
-
-  def spread_infohash(pid, infohash, to_query, queried, peers, rounds) do
-    # 1 - get the contacts
-    # 2 - loop on them calling get_peers(p, c, i)
-    responses =
-      to_query
-      |> Task.async_stream(
-        fn c -> get_peers(pid, c, infohash) end,
-        timeout: 2000,
-        on_timeout: :kill_task
-      )
-      |> Enum.flat_map(fn
-        {:ok, result} -> [result]
-        _ -> []
-      end)
-
-    queried = Enum.reduce(to_query, queried, fn c, acc -> MapSet.put(acc, c.id) end)
-
-    # 3 - for those that return :peers, store them in return value
-    peers =
-      Enum.reduce(responses, peers, fn
-        {:peers, val}, acc -> MapSet.union(acc, MapSet.new(val))
-        _, acc -> acc
-      end)
-
-    # 4 - for those that return :nodes, store them in pending
-    # 5 - rejec those already asked
-    pending =
-      Enum.reduce(responses, [], fn
-        {:nodes, val}, acc -> acc ++ val
-        _, acc -> acc
-      end)
-      |> Enum.uniq_by(& &1.id)
-      |> Enum.reject(&MapSet.member?(queried, &1.id))
-
-    if MapSet.size(peers) > 4 or Enum.empty?(pending),
-      do: peers,
-      else: spread_infohash(pid, infohash, pending, queried, peers, rounds - 1)
   end
 
   # -----------------
@@ -96,8 +40,19 @@ defmodule Exalia do
   def find_nodes(pid, contact, target),
     do: KNode.find_node(pid, contact, target)
 
-  def get_peers(pid, contact, infohash),
-    do: KNode.get_peers(pid, contact, infohash)
+  def get_peers(pid, infohash) do
+    # 4 - join all answers 
+    contacts = get_contacts(pid)
+
+    lookup_peers(
+      pid,
+      infohash,
+      contacts,
+      MapSet.new(),
+      MapSet.new(),
+      4
+    )
+  end
 
   # ------------------
   #  Helper functions
@@ -115,19 +70,11 @@ defmodule Exalia do
   def routing_table(pid),
     do: KNode.get_routing_table(pid)
 
-  # -------------------
-  #  Private functions
-  # -------------------
+  # ----------------------------
+  #     Lookup algorithms
+  # ---------------------------
 
-  defp closest_nodes(pid, target, alpha) do
-    routing_table(pid).kbuckets
-    |> Map.values()
-    |> List.flatten()
-    |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
-    |> Enum.take(alpha)
-  end
-
-  def iterative_lookup(pid, target) do
+  def lookup(pid, target) do
     initial_nodes = closest_nodes(pid, target, @alpha)
     do_lookup(pid, target, initial_nodes, _queried = MapSet.new(), _best = [], _round = 8)
   end
@@ -162,5 +109,59 @@ defmodule Exalia do
     if Enum.empty?(next_to_query),
       do: best,
       else: do_lookup(pid, target, next_to_query, queried, best, rounds - 1)
+  end
+
+  def lookup_peers(_pid, _infohash, _to_query, _queried, peers, 0),
+    do: peers
+
+  def lookup_peers(pid, infohash, to_query, queried, peers, rounds) do
+    # - get the contacts
+    # - loop on them calling get_peers(p, c, i)
+    responses =
+      to_query
+      |> Task.async_stream(
+        fn c -> KNode.get_peers(pid, c, infohash) end,
+        timeout: 2000,
+        on_timeout: :kill_task
+      )
+      |> Enum.flat_map(fn
+        {:ok, result} -> [result]
+        _ -> []
+      end)
+
+    queried = Enum.reduce(to_query, queried, fn c, acc -> MapSet.put(acc, c.id) end)
+
+    # - for those that return :peers, store them in return value
+    peers =
+      Enum.reduce(responses, peers, fn
+        {:peers, val}, acc -> MapSet.union(acc, MapSet.new(val))
+        _, acc -> acc
+      end)
+
+    # - for those that return :nodes, store them in pending
+    # - reject those already asked
+    pending =
+      Enum.reduce(responses, [], fn
+        {:nodes, val}, acc -> acc ++ val
+        _, acc -> acc
+      end)
+      |> Enum.uniq_by(& &1.id)
+      |> Enum.reject(&MapSet.member?(queried, &1.id))
+
+    if MapSet.size(peers) > 4 or Enum.empty?(pending),
+      do: peers,
+      else: lookup_peers(pid, infohash, pending, queried, peers, rounds - 1)
+  end
+
+  # -------------------
+  #  Private functions
+  # -------------------
+
+  defp closest_nodes(pid, target, alpha) do
+    routing_table(pid).kbuckets
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
+    |> Enum.take(alpha)
   end
 end
