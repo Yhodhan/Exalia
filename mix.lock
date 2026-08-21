@@ -1,0 +1,3 @@
+%{
+  "bencoder": {:git, "https://github.com/Yhodhan/Bencoder.git", "abf07c86f685dff99ac4b82f87ea986220cfebdb", [branch: "master"]},
+}
