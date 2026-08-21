@@ -5,7 +5,7 @@ defmodule Exalia do
 
   require Logger
 
-  @alpha 5
+  @alpha 6
   @k 8
 
   def bootstrap() do

@@ -15,7 +15,7 @@ defmodule Exalia.KNode do
     :id,
     :port,
     :socket,
-    :token,
+    tokens: %{},
     pending: %{}
   ]
 
@@ -112,7 +112,7 @@ defmodule Exalia.KNode do
 
     Logger.info("=== Ping Request sent ===")
 
-    pending = Map.put(state.pending, tid, from)
+    pending = Map.put(state.pending, tid, {from, :ping})
     {:noreply, %{state | pending: pending}}
   end
 
@@ -128,7 +128,7 @@ defmodule Exalia.KNode do
 
     Logger.info("=== Find Node Request Sent ===")
 
-    pending = Map.put(state.pending, tid, from)
+    pending = Map.put(state.pending, tid, {from, :find_node})
     {:noreply, %{state | pending: pending}}
   end
 
@@ -141,7 +141,20 @@ defmodule Exalia.KNode do
 
     Logger.info("=== Get Peers Request Sent ===")
 
-    pending = Map.put(state.pending, tid, from)
+    pending = Map.put(state.pending, tid, {from, :get_peers})
+    {:noreply, %{state | pending: pending}}
+  end
+
+  def handle_call({:announce_peer, contact, infohash, port, token}, from, state) do
+    tid = transaction_id()
+
+    {:ok, msg} = KRPC.announce_peer(tid, state.id, infohash, port, token)
+
+    :gen_udp.send(state.socket, contact.ip, contact.port, msg)
+
+    Logger.info("=== Announce Peer Sent ===")
+
+    pending = Map.put(state.pending, tid, {from, :announce_peer})
     {:noreply, %{state | pending: pending}}
   end
 
@@ -170,8 +183,8 @@ defmodule Exalia.KNode do
 
     with {:ok, data} <- result,
          {:ok, tid, response} <- analyze_response(data),
-         {:ok, from, pending} <- fetch_tx(tid, state) do
-      {response, state} = handle_response(state, response, {ip, port})
+         {:ok, {from, type}, pending} <- fetch_tx(tid, state) do
+      {response, state} = handle_response(state, type, response, {ip, port})
       GenServer.reply(from, response)
       {:noreply, %{state | pending: pending}}
     else
@@ -191,66 +204,95 @@ defmodule Exalia.KNode do
     end
   end
 
-  # ---------------------------
-  #   Handle network responses
-  # ---------------------------
+  # ----------------------------------------------------
+  #               HANDLE NETWORK RESPONSES
+  # ----------------------------------------------------
 
-  def handle_response(state, response, address) do
-    case response["r"] do
-      %{"id" => _id, "token" => token, "nodes" => nodes} ->
-        handle_get_peers_nodes(state, token, nodes)
+  def handle_response(state, :ping, response, address),
+    do: handle_ping(state, response, address)
 
-      %{"id" => _id, "token" => token, "values" => values} ->
-        handle_get_peers_values(state, token, values)
+  def handle_response(state, :find_node, response, _address),
+    do: handle_find_node(state, response)
 
-      %{"id" => _id, "nodes" => nodes} ->
-        handle_find_node(state, nodes)
+  def handle_response(state, :get_peers, response, _address),
+    do: handle_get_peers(state, response)
 
-      %{"id" => id} ->
-        handle_ping(state, id, address)
+  def handle_response(state, :announce_peers, response, _address),
+    do: handle_announce_peer(state, response)
 
-      _ ->
-        {:unknown_command, state}
-    end
-  end
+  def handle_response(state, _type, _response, _address),
+    do: {:unknown_command, state}
 
-  def handle_ping(state, raw_id, {ip, port}) do
+  # ----------------------------------------------------
+  #                       PING 
+  # ----------------------------------------------------
+
+  def handle_ping(state, response, {ip, port}) do
     Logger.info("=== Ping received ===")
+    %{"id" => id} = response["r"]
     # store the node in the routing table
-    id = :binary.decode_unsigned(raw_id)
+    id = :binary.decode_unsigned(id)
     candidate = Candidate.new(id, ip, port)
     table = RoutingTable.insert(state.routing_table, candidate)
 
     {:pong, %{state | routing_table: table}}
   end
 
-  def handle_find_node(state, nodes) do
+  # ----------------------------------------------------
+  #                     FIND NODE
+  # ----------------------------------------------------
+
+  def handle_find_node(state, response) do
     Logger.info("=== Find Nodes received ===")
+    %{"id" => _id, "nodes" => nodes} = response["r"]
+
     {decoded_nodes, table} = fill_routing_table(state, nodes)
 
     {decoded_nodes, %{state | routing_table: table}}
   end
 
-  def handle_get_peers_nodes(state, token, nodes) do
-    Logger.info("=== Get Peers Received: Nodes ===")
-    {decoded_nodes, table} = fill_routing_table(state, nodes)
+  # ----------------------------------------------------
+  #                     GET PEERS 
+  # ----------------------------------------------------
 
-    {{:nodes, decoded_nodes}, %{state | routing_table: table, token: token}}
+  def handle_get_peers(state, response) do
+    case response["r"] do
+      %{"id" => id, "token" => token, "nodes" => nodes} ->
+        Logger.info("=== Get Peers Received: Nodes ===")
+        id = :binary.decode_unsigned(id)
+        tokens = Map.put(state.tokens, id, token)
+
+        {decoded_nodes, table} = fill_routing_table(state, nodes)
+
+        {{:nodes, decoded_nodes}, %{state | routing_table: table, tokens: tokens}}
+
+      %{"id" => id, "token" => token, "values" => values} ->
+        Logger.info("=== Get Peers Received: Peers ===")
+        id = :binary.decode_unsigned(id)
+        tokens = Map.put(state.tokens, id, token)
+
+        peers = Enum.map(values, fn v -> decode_peer(v) end)
+
+        {{:peers, peers}, %{state | tokens: tokens}}
+
+      _ ->
+        Logger.warning("Unexpected get_peers response shape: #{inspect(response)}")
+        {{:error, :unexpected_response}, state}
+    end
   end
 
-  def handle_get_peers_values(state, token, values) do
-    Logger.info("=== Get Peers Received: Peers ===")
-    peers = Enum.map(values, fn v -> decode_peer(v) end)
+  # ----------------------------------------------------
+  #                    ANNOUNCE PEERS 
+  # ----------------------------------------------------
 
-    {{:peers, peers}, %{state | token: token}}
+  def handle_announce_peer(state, _response) do
+    # nothing to store — just acknowledge success to the caller
+    {:announced, state}
   end
 
-  def handle_announce_peers() do
-  end
-
-  # ------------------
-  # Private functions
-  # ------------------
+  # ----------------------------------------------------
+  #                   PRIVATE FUNCTIONS
+  # ----------------------------------------------------
 
   defp parse_nodes(bytes) do
     case bytes do
@@ -304,7 +346,7 @@ defmodule Exalia.KNode do
   defp fetch_tx(tid, state) do
     case Map.pop(state.pending, tid) do
       {nil, _pending} -> :error
-      {from, pending} -> {:ok, from, pending}
+      {from_and_type, pending} -> {:ok, from_and_type, pending}
     end
   end
 

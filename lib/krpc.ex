@@ -31,6 +31,28 @@ defmodule Exalia.KRPC do
     Encoder.encode(q)
   end
 
+  def announce_peer(tid, id, infohash, port, token),
+    do: announce_peer(tid, id, infohash, port, token, _implied_port = 0)
+
+  def announce_peer(tid, id, infohash, port, token, implied_port) do
+    id = generate_binary_id(id)
+
+    q = %{
+      "t" => tid,
+      "y" => "q",
+      "q" => "announce_peer",
+      "a" => %{
+        "id" => id,
+        "implied_port" => implied_port,
+        "info_hash" => infohash,
+        "port" => port,
+        "token" => token
+      }
+    }
+
+    Encoder.encode(q)
+  end
+
   # ------------------
   # Private functions
   # ------------------
