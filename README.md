@@ -1,21 +1,4 @@
 # Exalia
 
-**TODO: Add description**
-
-## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `exalia` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:exalia, "~> 0.1.0"}
-  ]
-end
-```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/exalia>.
-
+A simple implementation of the Distributed hash table Kademlia, the Project was intended to be used in my torrent client and developed with that purpose in main. Currently is being used for it and improvements are inteded to be done into both projects.
+In Exalia proper refreshing and some error handlings must be implemented properly, as it is used and tested in Exorrent i will correct the bugs and performance issues.
