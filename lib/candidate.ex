@@ -2,7 +2,8 @@ defmodule Exalia.Candidate do
   defstruct [
     :id,
     :ip,
-    :port
+    :port,
+    :last_seen
   ]
 
   def new(id, ip, port),
