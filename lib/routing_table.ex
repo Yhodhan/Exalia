@@ -38,6 +38,14 @@ defmodule Exalia.RoutingTable do
     %__MODULE__{table | kbuckets: Map.put(table.kbuckets, index, bucket)}
   end
 
+  def fetch_candidate(table, id) do
+    distance = xor_distance(table.id, id)
+    index = bucket_index(distance)
+    bucket = fetch_bucket(table, index)
+
+    Enum.find(bucket, fn c -> c.id == id end)
+  end
+
   # ------------------
   # Private functions
   # ------------------

@@ -54,6 +54,22 @@ defmodule Exalia do
     )
   end
 
+  def announce_peer(pid, infohash, port) do
+    # fetch list of contacts and one by one send the request
+    table = KNode.get_routing_table(pid)
+    tokens = KNode.get_tokens(pid)
+
+    tokens
+    |> Enum.map(fn {id, token} -> {RoutingTable.fetch_candidate(table, id), token} end)
+    |> Enum.reject(fn {candidate, _token} -> is_nil(candidate) end)
+    |> Task.async_stream(
+      fn {c, token} -> KNode.announce_peer(pid, c, infohash, port, token) end,
+      timeout: 2000,
+      on_timeout: :kill_task
+    )
+    |> Enum.to_list()
+  end
+
   # ------------------
   #  Helper functions
   # ------------------

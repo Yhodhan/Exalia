@@ -67,6 +67,14 @@ defmodule Exalia.KNode do
     end
   end
 
+  def announce_peer(pid, contact, infohash, port, token) do
+    try do
+      GenServer.call(pid, {:announce_peer, contact, infohash, port, token}, @time_out)
+    catch
+      :exit, {:timeout, _} -> {:error, :timeout}
+    end
+  end
+
   # ------------------
   #  Helper functions
   # ------------------
@@ -79,6 +87,9 @@ defmodule Exalia.KNode do
 
   def get_routing_table(pid),
     do: GenServer.call(pid, :routing_table)
+
+  def get_tokens(pid),
+    do: GenServer.call(pid, :tokens)
 
   # ----------------------
   #  GenServer functions
@@ -166,6 +177,9 @@ defmodule Exalia.KNode do
 
   def handle_call(:node_id, _from, state),
     do: {:reply, state.id, state}
+
+  def handle_call(:tokens, _from, state),
+    do: {:reply, state.tokens, state}
 
   # ---------------------------
   #    Handle Port connection 
