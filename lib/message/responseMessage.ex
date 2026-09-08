@@ -7,7 +7,7 @@ defmodule Message.ResponseMessage do
   #                       PING
   # ----------------------------------------------------
 
-  def handle_ping(state, response, {ip, port}) do
+  def ping(state, response, {ip, port}) do
     Logger.info("=== Ping received ===")
     %{"id" => id} = response["r"]
     # store the node in the routing table
@@ -22,7 +22,7 @@ defmodule Message.ResponseMessage do
   #                     FIND NODE
   # ----------------------------------------------------
 
-  def handle_find_node(state, response) do
+  def find_node(state, response) do
     Logger.info("=== Find Nodes received ===")
     %{"id" => _id, "nodes" => nodes} = response["r"]
 
@@ -35,7 +35,7 @@ defmodule Message.ResponseMessage do
   #                     GET PEERS
   # ----------------------------------------------------
 
-  def handle_get_peers(state, response) do
+  def get_peers(state, response) do
     case response["r"] do
       %{"id" => id, "token" => token, "nodes" => nodes} ->
         Logger.info("=== Get Peers Received: Nodes ===")
@@ -65,7 +65,7 @@ defmodule Message.ResponseMessage do
   #                    ANNOUNCE PEERS
   # ----------------------------------------------------
 
-  def handle_announce_peer(state, _response) do
+  def announce_peer(state, _response) do
     # nothing to store — just acknowledge success to the caller
     {:announced, state}
   end

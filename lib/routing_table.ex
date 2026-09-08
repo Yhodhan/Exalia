@@ -3,6 +3,9 @@ defmodule Exalia.RoutingTable do
 
   alias Exalia.KBucket
   alias Exalia.Candidate
+  alias Exalia.Utils
+
+  @alpha 8
 
   defstruct [
     :id,
@@ -46,13 +49,24 @@ defmodule Exalia.RoutingTable do
     Enum.find(bucket, fn c -> c.id == id end)
   end
 
+  def has_candidate?(table, id),
+    do: is_nil(fetch_candidate(table, id))
+
+  def get_closest_candidates(table, id) do
+    table.kbuckets
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.sort_by(fn c -> xor_distance(c.id, id) end)
+    |> Enum.take(@alpha)
+  end
+
   # ------------------
   # Private functions
   # ------------------
 
   def xor_distance(a, b) do
-    a = conversion(a)
-    b = conversion(b)
+    a = Utils.conversion(a)
+    b = Utils.conversion(b)
 
     bxor(a, b)
   end
@@ -73,9 +87,4 @@ defmodule Exalia.RoutingTable do
 
   defp bucket_index(distance, index),
     do: bucket_index(distance >>> 1, index + 1)
-
-  defp conversion(value) when is_binary(value),
-    do: :binary.decode_unsigned(value)
-
-  defp conversion(value), do: value
 end

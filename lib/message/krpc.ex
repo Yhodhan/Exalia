@@ -3,17 +3,14 @@ defmodule Exalia.KRPC do
 
   @id_size_bytes 20
 
+  # -------------------------------
+  #            Responses
+  # -------------------------------
+
   def ping(tid, id) do
     id = generate_binary_id(id)
 
     q = %{"t" => tid, "y" => "q", "q" => "ping", "a" => %{"id" => id}}
-    Encoder.encode(q)
-  end
-
-  def ping_query(tid, id) do
-    id = generate_binary_id(id)
-
-    q = %{"t" => tid, "y" => "r", "r" => %{"id" => id}}
     Encoder.encode(q)
   end
 
@@ -56,6 +53,24 @@ defmodule Exalia.KRPC do
         "token" => token
       }
     }
+
+    Encoder.encode(q)
+  end
+
+  # -------------------------------
+  #            Responses
+  # -------------------------------
+  def ping_query(tid, id) do
+    id = generate_binary_id(id)
+
+    q = %{"t" => tid, "y" => "r", "r" => %{"id" => id}}
+    Encoder.encode(q)
+  end
+
+  def find_node_query(tid, id, value) do
+    id = generate_binary_id(id)
+
+    q = %{"t" => tid, "y" => "r", "r" => %{"id" => id, "nodes" => value}}
 
     Encoder.encode(q)
   end

@@ -2,7 +2,6 @@ defmodule Exalia.KNode do
   alias Exalia.RoutingTable
   alias Exalia.KRPC
   alias Bencoder.Decoder
-  alias Exalia.Candidate
   alias Exalia.Config
   alias Message.QueryMessage
   alias Message.ResponseMessage
@@ -211,14 +210,10 @@ defmodule Exalia.KNode do
          {:ok, type, data} <- analyze_response(data) do
       case type do
         :response ->
-          {:ok, {from, type}, pending} = fetch_tx(data["t"], state)
-          {response, state} = handle_response(state, type, data, {ip, port})
-          GenServer.reply(from, response)
-          {:noreply, %{state | pending: pending}}
+          process_response(data, state, {ip, port})
 
         :query ->
-          {_response, state} = handle_query(state, data["q"], data, {ip, port})
-          {:noreply, state}
+          {:noreply, handle_query(state, data["q"], data, {ip, port})}
       end
     else
       _ ->
@@ -241,17 +236,24 @@ defmodule Exalia.KNode do
   #               HANDLE NETWORK RESPONSES
   # ----------------------------------------------------
 
+  def process_response(data, state, {ip, port}) do
+    {:ok, {from, type}, pending} = fetch_tx(data["t"], state)
+    {response, state} = handle_response(state, type, data, {ip, port})
+    GenServer.reply(from, response)
+    {:noreply, %{state | pending: pending}}
+  end
+
   def handle_response(state, :ping, response, address),
-    do: ResponseMessage.handle_ping(state, response, address)
+    do: ResponseMessage.ping(state, response, address)
 
   def handle_response(state, :find_node, response, _address),
-    do: ResponseMessage.handle_find_node(state, response)
+    do: ResponseMessage.find_node(state, response)
 
   def handle_response(state, :get_peers, response, _address),
-    do: ResponseMessage.handle_get_peers(state, response)
+    do: ResponseMessage.get_peers(state, response)
 
   def handle_response(state, :announce_peers, response, _address),
-    do: ResponseMessage.handle_announce_peer(state, response)
+    do: ResponseMessage.announce_peer(state, response)
 
   def handle_response(state, _type, _response, _address),
     do: {:unknown_command, state}
@@ -261,7 +263,10 @@ defmodule Exalia.KNode do
   # ----------------------------------------------------
 
   def handle_query(state, "ping", query, address),
-    do: QueryMessage.response_ping(state, query, address)
+    do: QueryMessage.ping(state, query, address)
+
+  def handle_query(state, "find_node", query, address),
+    do: QueryMessage.find_node(state, query, address)
 
   # ----------------------------------------------------
   #                   PRIVATE FUNCTIONS
