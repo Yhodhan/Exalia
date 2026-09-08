@@ -10,6 +10,13 @@ defmodule Exalia.KRPC do
     Encoder.encode(q)
   end
 
+  def ping_query(tid, id) do
+    id = generate_binary_id(id)
+
+    q = %{"t" => tid, "y" => "r", "r" => %{"id" => id}}
+    Encoder.encode(q)
+  end
+
   def find_node(tid, id, target) do
     id = generate_binary_id(id)
     t = generate_binary_id(target)
