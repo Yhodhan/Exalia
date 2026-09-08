@@ -32,7 +32,11 @@ defmodule Message.QueryMessage do
 
     {:ok, msg} =
       if RoutingTable.has_candidate?(state.table, target_id) do
-        candidate = RoutingTable.fetch_candidate(state.table, target_id)
+        candidate =
+          state.table
+          |> RoutingTable.fetch_candidate(target_id)
+          |> encode_candidate()
+
         KRPC.find_node_query(tid, own_id, candidate)
       else
         nodes =
