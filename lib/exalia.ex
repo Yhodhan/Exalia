@@ -41,7 +41,7 @@ defmodule Exalia do
     do: KNode.find_node(pid, contact, target)
 
   def get_peers(pid, infohash) do
-    # 4 - join all answers 
+    # 4 - join all answers
     contacts = get_contacts(pid)
 
     lookup_peers(
@@ -80,6 +80,7 @@ defmodule Exalia do
   def get_contacts(pid),
     do: KNode.contacs(pid)
 
+  @spec node_id(atom() | pid() | {atom(), any()} | {:via, atom(), any()}) :: any()
   def node_id(pid),
     do: KNode.get_node_id(pid)
 

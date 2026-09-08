@@ -4,6 +4,8 @@ defmodule Exalia.KNode do
   alias Bencoder.Decoder
   alias Exalia.Candidate
   alias Exalia.Config
+  alias Message.QueryMessage
+  alias Message.ResponseMessage
 
   use GenServer
   require Logger
@@ -240,16 +242,16 @@ defmodule Exalia.KNode do
   # ----------------------------------------------------
 
   def handle_response(state, :ping, response, address),
-    do: handle_ping(state, response, address)
+    do: ResponseMessage.handle_ping(state, response, address)
 
   def handle_response(state, :find_node, response, _address),
-    do: handle_find_node(state, response)
+    do: ResponseMessage.handle_find_node(state, response)
 
   def handle_response(state, :get_peers, response, _address),
-    do: handle_get_peers(state, response)
+    do: ResponseMessage.handle_get_peers(state, response)
 
   def handle_response(state, :announce_peers, response, _address),
-    do: handle_announce_peer(state, response)
+    do: ResponseMessage.handle_announce_peer(state, response)
 
   def handle_response(state, _type, _response, _address),
     do: {:unknown_command, state}
@@ -259,129 +261,11 @@ defmodule Exalia.KNode do
   # ----------------------------------------------------
 
   def handle_query(state, "ping", query, address),
-    do: response_ping(state, query, address)
-
-  # ----------------------------------------------------
-  #                       PING
-  # ----------------------------------------------------
-
-  def handle_ping(state, response, {ip, port}) do
-    Logger.info("=== Ping received ===")
-    %{"id" => id} = response["r"]
-    # store the node in the routing table
-    id = :binary.decode_unsigned(id)
-    candidate = Candidate.new(id, ip, port)
-    table = RoutingTable.insert(state.routing_table, candidate)
-
-    {:pong, %{state | routing_table: table}}
-  end
-
-  # ----------------------------------------------------
-  #                     FIND NODE
-  # ----------------------------------------------------
-
-  def handle_find_node(state, response) do
-    Logger.info("=== Find Nodes received ===")
-    %{"id" => _id, "nodes" => nodes} = response["r"]
-
-    {decoded_nodes, table} = fill_routing_table(state, nodes)
-
-    {decoded_nodes, %{state | routing_table: table}}
-  end
-
-  # ----------------------------------------------------
-  #                     GET PEERS
-  # ----------------------------------------------------
-
-  def handle_get_peers(state, response) do
-    case response["r"] do
-      %{"id" => id, "token" => token, "nodes" => nodes} ->
-        Logger.info("=== Get Peers Received: Nodes ===")
-        id = :binary.decode_unsigned(id)
-        tokens = Map.put(state.tokens, id, token)
-
-        {decoded_nodes, table} = fill_routing_table(state, nodes)
-
-        {{:nodes, decoded_nodes}, %{state | routing_table: table, tokens: tokens}}
-
-      %{"id" => id, "token" => token, "values" => values} ->
-        Logger.info("=== Get Peers Received: Peers ===")
-        id = :binary.decode_unsigned(id)
-        tokens = Map.put(state.tokens, id, token)
-
-        peers = Enum.map(values, fn v -> decode_peer(v) end)
-
-        {{:peers, peers}, %{state | tokens: tokens}}
-
-      _ ->
-        Logger.warning("Unexpected get_peers response shape: #{inspect(response)}")
-        {{:error, :unexpected_response}, state}
-    end
-  end
-
-  # ----------------------------------------------------
-  #                    ANNOUNCE PEERS
-  # ----------------------------------------------------
-
-  def handle_announce_peer(state, _response) do
-    # nothing to store — just acknowledge success to the caller
-    {:announced, state}
-  end
-
-  # ----------------------------------------------------
-  #                       PONG
-  # ----------------------------------------------------
-
-  def response_ping(state, query, {ip, port}) do
-    Logger.info("=== Ping query received ===")
-    tid = query["t"]
-    own_id = state.id
-
-    {:ok, msg} = KRPC.ping_query(tid, own_id)
-    :gen_udp.send(state.socket, ip, port, msg)
-
-    # store contact
-    %{"id" => id} = query["a"]
-    id = :binary.decode_unsigned(id)
-    candidate = Candidate.new(id, ip, port)
-    table = RoutingTable.insert(state.routing_table, candidate)
-    {:ping, %{state | routing_table: table}}
-  end
+    do: QueryMessage.response_ping(state, query, address)
 
   # ----------------------------------------------------
   #                   PRIVATE FUNCTIONS
   # ----------------------------------------------------
-
-  defp parse_nodes(bytes) do
-    case bytes do
-      <<>> ->
-        []
-
-      <<id::binary-size(20), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, a, b, c, d,
-        port::binary-size(2), rest::binary>> ->
-        build_candidate(id, {a, b, c, d}, port) ++ parse_nodes(rest)
-
-      <<id::binary-size(20), a, b, c, d, port::binary-size(2), rest::binary>> ->
-        build_candidate(id, {a, b, c, d}, port) ++ parse_nodes(rest)
-
-      leftover ->
-        Logger.warning(
-          "=== Unparseable trailing node bytes (#{byte_size(leftover)} bytes), dropping ==="
-        )
-
-        []
-    end
-  end
-
-  defp build_candidate(id, ip, port) do
-    id = :binary.decode_unsigned(id)
-    port = :binary.decode_unsigned(port)
-    candidate = Candidate.new(id, ip, port)
-    [candidate]
-  end
-
-  defp decode_peer(<<a, b, c, d, port::16>>),
-    do: {{a, b, c, d}, port}
 
   defp generate_id() do
     bytes = :crypto.strong_rand_bytes(@id_size_bytes)
@@ -413,18 +297,5 @@ defmodule Exalia.KNode do
       {nil, _pending} -> :error
       {from_and_type, pending} -> {:ok, from_and_type, pending}
     end
-  end
-
-  def fill_routing_table(state, nodes) do
-    decoded_nodes =
-      parse_nodes(nodes)
-      |> Enum.uniq_by(& &1.id)
-
-    {decoded_nodes,
-     decoded_nodes
-     |> Enum.reject(&(&1.id == state.id))
-     |> Enum.reduce(state.routing_table, fn n, table ->
-       RoutingTable.insert(table, n)
-     end)}
   end
 end
