@@ -12,4 +12,9 @@ defmodule Exalia.Utils do
 
     bxor(a, b)
   end
+
+  def generate_token(ip, secret) do
+    ip_bin = ip |> Tuple.to_list() |> :erlang.list_to_binary()
+    :crypto.hash(:sha, ip_bin <> secret)
+  end
 end

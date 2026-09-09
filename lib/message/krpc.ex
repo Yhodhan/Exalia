@@ -75,6 +75,21 @@ defmodule Exalia.KRPC do
     Encoder.encode(q)
   end
 
+  def get_peers_query(tid, id, nodes, token, type) do
+    id = generate_binary_id(id)
+
+    q =
+      case type do
+        :values ->
+          %{"t" => tid, "y" => "r", "r" => %{"id" => id, "token" => token, "values" => nodes}}
+
+        :nodes ->
+          %{"t" => tid, "y" => "r", "r" => %{"id" => id, "token" => token, "nodes" => nodes}}
+      end
+
+    Encoder.encode(q)
+  end
+
   # ------------------
   # Private functions
   # ------------------

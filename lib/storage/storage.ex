@@ -44,11 +44,11 @@ defmodule Exalia.Storage do
     {:noreply, state}
   end
 
-  def handle_call({:hash_infohash, infohash}, _from, state) do
-    {:reply, Map.has_key?(state, infohash), state}
-  end
-
   def handle_call({:get_nodes, infohash}, _from, state) do
     {:reply, Map.get(state, infohash), state}
+  end
+
+  def handle_call({:hash_infohash, infohash}, _from, state) do
+    {:reply, Map.has_key?(state, infohash), state}
   end
 end

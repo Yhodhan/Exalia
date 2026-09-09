@@ -22,8 +22,6 @@ defmodule Message.ResponseMessage do
         Logger.warning("Unexpected ping response shape: #{inspect(response)}")
         {:error_ping, state}
     end
-
-    # store the node in the routing table
   end
 
   # ----------------------------------------------------

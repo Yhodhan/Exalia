@@ -1,8 +1,9 @@
 defmodule Exalia.KNode do
-  alias Exalia.RoutingTable
   alias Exalia.KRPC
-  alias Bencoder.Decoder
   alias Exalia.Config
+  alias Exalia.Storage
+  alias Exalia.RoutingTable
+  alias Bencoder.Decoder
   alias Message.QueryMessage
   alias Message.ResponseMessage
 
@@ -17,6 +18,7 @@ defmodule Exalia.KNode do
     :id,
     :port,
     :socket,
+    :secret,
     tokens: %{},
     pending: %{}
   ]
@@ -25,9 +27,14 @@ defmodule Exalia.KNode do
     id = generate_id()
     rtable = RoutingTable.new(id)
 
+    :ok = Storage.start_link()
+
+    secret = generate_secret()
+
     state = %__MODULE__{
       routing_table: rtable,
-      id: id
+      id: id,
+      secret: secret
     }
 
     {:ok, pid} = start_link(state)
@@ -317,6 +324,9 @@ defmodule Exalia.KNode do
     bytes = :crypto.strong_rand_bytes(@id_size_bytes)
     :binary.decode_unsigned(bytes)
   end
+
+  defp generate_secret(),
+    do: :crypto.strong_rand_bytes(20)
 
   defp transaction_id(),
     do: :crypto.strong_rand_bytes(2)
