@@ -2,6 +2,7 @@ defmodule Exalia do
   alias Exalia.KNode
   alias Exalia.Config
   alias Exalia.RoutingTable
+  alias Exalia.Utils
 
   require Logger
 
@@ -115,7 +116,7 @@ defmodule Exalia do
 
     best =
       (best ++ new_candidates)
-      |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
+      |> Enum.sort_by(fn c -> Utils.xor_distance(c.id, target) end)
       |> Enum.take(@k)
 
     next_to_query =
@@ -178,7 +179,7 @@ defmodule Exalia do
     routing_table(pid).kbuckets
     |> Map.values()
     |> List.flatten()
-    |> Enum.sort_by(fn c -> RoutingTable.xor_distance(c.id, target) end)
+    |> Enum.sort_by(fn c -> Utils.xor_distance(c.id, target) end)
     |> Enum.take(alpha)
   end
 end

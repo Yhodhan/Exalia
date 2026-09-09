@@ -42,7 +42,7 @@ defmodule Exalia.RoutingTable do
   end
 
   def fetch_candidate(table, id) do
-    distance = xor_distance(table.id, id)
+    distance = Utils.xor_distance(table.id, id)
     index = bucket_index(distance)
     bucket = fetch_bucket(table, index)
 
@@ -50,29 +50,27 @@ defmodule Exalia.RoutingTable do
   end
 
   def has_candidate?(table, id),
-    do: is_nil(fetch_candidate(table, id))
+    do: not is_nil(fetch_candidate(table, id))
 
   def get_closest_candidates(table, id) do
     table.kbuckets
     |> Map.values()
     |> List.flatten()
-    |> Enum.sort_by(fn c -> xor_distance(c.id, id) end)
+    |> Enum.sort_by(fn c -> Utils.xor_distance(c.id, id) end)
     |> Enum.take(@alpha)
+  end
+
+  def get_contacts(table) do
+    table.kbuckets
+    |> Map.values()
+    |> List.flatten()
   end
 
   # ------------------
   # Private functions
   # ------------------
-
-  def xor_distance(a, b) do
-    a = Utils.conversion(a)
-    b = Utils.conversion(b)
-
-    bxor(a, b)
-  end
-
   defp get_bucket(table, id) do
-    distance = xor_distance(table.id, id)
+    distance = Utils.xor_distance(table.id, id)
     index = bucket_index(distance)
 
     {fetch_bucket(table, index), index}

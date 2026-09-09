@@ -112,9 +112,7 @@ defmodule Exalia.KNode do
   end
 
   def handle_call(:contacts, _from, state) do
-    contacts =
-      Map.values(state.routing_table.kbuckets)
-      |> List.flatten()
+    contacts = RoutingTable.get_contacts(state.routing_table)
 
     {:reply, contacts, state}
   end
@@ -214,6 +212,9 @@ defmodule Exalia.KNode do
 
         :query ->
           {:noreply, handle_query(state, data["q"], data, {ip, port})}
+
+        :error ->
+          {:noreply, handle_error(data)}
       end
     else
       _ ->
@@ -255,8 +256,13 @@ defmodule Exalia.KNode do
   def handle_response(state, :announce_peers, response, _address),
     do: ResponseMessage.announce_peer(state, response)
 
-  def handle_response(state, _type, _response, _address),
-    do: {:unknown_command, state}
+  def handle_response(state, _type, _response, {ip, port}) do
+    Logger.warning(
+      "=== Unknown Reponse received from address: #{inspect(ip)} port: #{inspect(port)}"
+    )
+
+    {:noreply, state}
+  end
 
   # ----------------------------------------------------
   #               HANDLE NETWORK QUERIES
@@ -267,6 +273,29 @@ defmodule Exalia.KNode do
 
   def handle_query(state, "find_node", query, address),
     do: QueryMessage.find_node(state, query, address)
+
+  def handle_query(_state, type, _, {ip, port}),
+    do:
+      Logger.warning(
+        "=== Unknown Query received : #{inspect(type)} from address: #{inspect(ip)} port: #{inspect(port)}"
+      )
+
+  # ----------------------------------------------------
+  #               HANDLE NETWORK QUERIES
+  # ----------------------------------------------------
+
+  def handle_error(data) do
+    # Bencoded error responses contain an "e" key with [error_code, error_message]
+    case Map.get(data, "e") do
+      [code, message] ->
+        Logger.error("DHT Node returned error #{code}: #{message}")
+
+      # NOTE: remove the peer from the routing table and the pending transactions
+
+      _ ->
+        Logger.error("DHT Node returned malformed error structure: #{inspect(data)}")
+    end
+  end
 
   # ----------------------------------------------------
   #                   PRIVATE FUNCTIONS

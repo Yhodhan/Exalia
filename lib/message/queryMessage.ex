@@ -31,9 +31,9 @@ defmodule Message.QueryMessage do
     target_id = Utils.conversion(query["a"]["target"])
 
     {:ok, msg} =
-      if RoutingTable.has_candidate?(state.table, target_id) do
+      if RoutingTable.has_candidate?(state.routing_table, target_id) do
         candidate =
-          state.table
+          state.routing_table
           |> RoutingTable.fetch_candidate(target_id)
           |> encode_candidate()
 
@@ -55,7 +55,7 @@ defmodule Message.QueryMessage do
   #  Private functions
   # -------------------
   defp get_closest_candidates(state, target_id),
-    do: RoutingTable.get_closest_candidates(state.table, target_id)
+    do: RoutingTable.get_closest_candidates(state.routing_table, target_id)
 
   # TODO: function to encode the candidates
 
@@ -65,8 +65,8 @@ defmodule Message.QueryMessage do
     encode_candidate(candidate) <> encode_candidates(rest)
   end
 
-  defp encode_candidate(%Candidate{ip: ip, port: port} = _c) do
+  defp encode_candidate(%Candidate{id: id, ip: ip, port: port} = _c) do
     {a, b, c, d} = ip
-    <<a, b, c, d, port::binary>>
+    <<id::size(160)-big, a, b, c, d, port::size(16)-big>>
   end
 end

@@ -9,13 +9,21 @@ defmodule Message.ResponseMessage do
 
   def ping(state, response, {ip, port}) do
     Logger.info("=== Ping received ===")
-    %{"id" => id} = response["r"]
-    # store the node in the routing table
-    id = :binary.decode_unsigned(id)
-    candidate = Candidate.new(id, ip, port)
-    table = RoutingTable.insert(state.routing_table, candidate)
 
-    {:pong, %{state | routing_table: table}}
+    case response["r"] do
+      %{"id" => id} ->
+        id = :binary.decode_unsigned(id)
+        candidate = Candidate.new(id, ip, port)
+        table = RoutingTable.insert(state.routing_table, candidate)
+
+        {:pong, %{state | routing_table: table}}
+
+      _ ->
+        Logger.warning("Unexpected ping response shape: #{inspect(response)}")
+        {:error_ping, state}
+    end
+
+    # store the node in the routing table
   end
 
   # ----------------------------------------------------
@@ -24,11 +32,17 @@ defmodule Message.ResponseMessage do
 
   def find_node(state, response) do
     Logger.info("=== Find Nodes received ===")
-    %{"id" => _id, "nodes" => nodes} = response["r"]
 
-    {decoded_nodes, table} = fill_routing_table(state, nodes)
+    case response["r"] do
+      %{"id" => _id, "nodes" => nodes} ->
+        {decoded_nodes, table} = fill_routing_table(state, nodes)
 
-    {decoded_nodes, %{state | routing_table: table}}
+        {decoded_nodes, %{state | routing_table: table}}
+
+      _ ->
+        Logger.warning("Unexpected find node response shape: #{inspect(response)}")
+        {[], state}
+    end
   end
 
   # ----------------------------------------------------
