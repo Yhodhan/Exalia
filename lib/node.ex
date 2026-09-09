@@ -38,7 +38,7 @@ defmodule Exalia.KNode do
   #   GenServer calls
   # -------------------
 
-  def start_link(state \\ []),
+  def start_link(state \\ %{}),
     do: GenServer.start_link(__MODULE__, state)
 
   # -----------------
@@ -278,6 +278,9 @@ defmodule Exalia.KNode do
 
   def handle_query(state, "find_node", query, address),
     do: {:noreply, QueryMessage.find_node(state, query, address)}
+
+  def handle_query(state, "get_peers", query, address),
+    do: {:noreply, QueryMessage.get_peers(state, query, address)}
 
   def handle_query(state, type, _, {ip, port}) do
     Logger.warning(

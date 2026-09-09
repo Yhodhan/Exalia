@@ -51,6 +51,9 @@ defmodule Message.QueryMessage do
     state
   end
 
+  def get_peers(state, query, {ip, port}) do
+  end
+
   # -------------------
   #  Private functions
   # -------------------
