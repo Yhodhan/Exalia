@@ -211,10 +211,10 @@ defmodule Exalia.KNode do
           process_response(data, state, {ip, port})
 
         :query ->
-          {:noreply, handle_query(state, data["q"], data, {ip, port})}
+          handle_query(state, data["q"], data, {ip, port})
 
         :error ->
-          {:noreply, handle_error(data)}
+          handle_error(state, data)
       end
     else
       _ ->
@@ -238,10 +238,15 @@ defmodule Exalia.KNode do
   # ----------------------------------------------------
 
   def process_response(data, state, {ip, port}) do
-    {:ok, {from, type}, pending} = fetch_tx(data["t"], state)
-    {response, state} = handle_response(state, type, data, {ip, port})
-    GenServer.reply(from, response)
-    {:noreply, %{state | pending: pending}}
+    case fetch_tx(data["t"], state) do
+      {:ok, {from, type}, pending} ->
+        {response, state} = handle_response(state, type, data, {ip, port})
+        GenServer.reply(from, response)
+        {:noreply, %{state | pending: pending}}
+
+      _ ->
+        {:noreply, state}
+    end
   end
 
   def handle_response(state, :ping, response, address),
@@ -269,22 +274,24 @@ defmodule Exalia.KNode do
   # ----------------------------------------------------
 
   def handle_query(state, "ping", query, address),
-    do: QueryMessage.ping(state, query, address)
+    do: {:noreply, QueryMessage.ping(state, query, address)}
 
   def handle_query(state, "find_node", query, address),
-    do: QueryMessage.find_node(state, query, address)
+    do: {:noreply, QueryMessage.find_node(state, query, address)}
 
-  def handle_query(_state, type, _, {ip, port}),
-    do:
-      Logger.warning(
-        "=== Unknown Query received : #{inspect(type)} from address: #{inspect(ip)} port: #{inspect(port)}"
-      )
+  def handle_query(state, type, _, {ip, port}) do
+    Logger.warning(
+      "=== Unknown Query received : #{inspect(type)} from address: #{inspect(ip)} port: #{inspect(port)}"
+    )
+
+    {:noreply, state}
+  end
 
   # ----------------------------------------------------
   #               HANDLE NETWORK QUERIES
   # ----------------------------------------------------
 
-  def handle_error(data) do
+  def handle_error(state, data) do
     # Bencoded error responses contain an "e" key with [error_code, error_message]
     case Map.get(data, "e") do
       [code, message] ->
@@ -295,6 +302,8 @@ defmodule Exalia.KNode do
       _ ->
         Logger.error("DHT Node returned malformed error structure: #{inspect(data)}")
     end
+
+    {:noreply, state}
   end
 
   # ----------------------------------------------------
