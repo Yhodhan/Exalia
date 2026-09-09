@@ -60,7 +60,7 @@ defmodule Message.QueryMessage do
     Logger.info("=== QUERY RECEIVED: GET PEERS ===")
     tid = query["t"]
     own_id = state.id
-    info_hash = query["info_hash"]
+    info_hash = query["a"]["info_hash"]
 
     # check if the Node has downloaders
     {nodes, type} = get_nodes(state, info_hash)

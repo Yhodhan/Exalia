@@ -27,7 +27,7 @@ defmodule Exalia.KNode do
     id = generate_id()
     rtable = RoutingTable.new(id)
 
-    :ok = Storage.start_link()
+    {:ok, _pid} = Storage.start_link()
 
     secret = generate_secret()
 
