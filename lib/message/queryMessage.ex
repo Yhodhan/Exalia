@@ -65,7 +65,7 @@ defmodule Message.QueryMessage do
     # check if the Node has downloaders
     {nodes, type} = get_nodes(state, info_hash)
 
-    token = Utils.generate_token(ip, state.secret)
+    token = Utils.generate_token(ip, state.token_secret)
     {:ok, msg} = KRPC.get_peers_query(tid, own_id, nodes, token, type)
 
     :gen_udp.send(state.socket, ip, port, msg)

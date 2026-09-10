@@ -12,13 +12,15 @@ defmodule Exalia.KNode do
 
   @id_size_bytes 20
   @time_out 2_000
+  @rotation_interval 5 * 60 * 1000
 
   defstruct [
     :routing_table,
     :id,
     :port,
     :socket,
-    :secret,
+    :token_secret,
+    :old_token_secret,
     tokens: %{},
     pending: %{}
   ]
@@ -106,6 +108,8 @@ defmodule Exalia.KNode do
 
   def init(state) do
     port = Config.dht_port()
+
+    Process.send_after(self(), :rotate_secret, @rotation_interval)
 
     case :gen_udp.open(port, [:binary, :inet, {:active, true}]) do
       {:ok, socket} ->
@@ -227,6 +231,15 @@ defmodule Exalia.KNode do
       _ ->
         {:noreply, state}
     end
+  end
+
+  def handle_info(:rotate_interval, state) do
+    Process.send_after(self(), :rotate_interval, @rotation_interval)
+
+    new_secret = generate_secret()
+    state = %{state | token_secret: new_secret, old_token_secret: state.secret}
+
+    {:noreply, state}
   end
 
   def handle_info({:request_timeout, tid}, state) do
