@@ -40,7 +40,7 @@ defmodule Message.QueryMessage do
           |> RoutingTable.fetch_candidate(target_id)
           |> encode_candidate()
 
-        KRPC.find_node_reponse(tid, own_id, candidate)
+        KRPC.find_node_response(tid, own_id, candidate)
       else
         Logger.info("=== FIND NODE REPLY: NODES ===")
 

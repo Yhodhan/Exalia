@@ -36,7 +36,7 @@ defmodule Exalia.KNode do
     state = %__MODULE__{
       routing_table: rtable,
       id: id,
-      secret: secret
+      token_secret: secret
     }
 
     {:ok, pid} = start_link(state)
