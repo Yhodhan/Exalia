@@ -237,7 +237,7 @@ defmodule Exalia.KNode do
     Process.send_after(self(), :rotate_secret, @rotation_interval)
 
     new_secret = generate_secret()
-    state = %{state | token_secret: new_secret, old_token_secret: state.secret}
+    state = %{state | token_secret: new_secret, old_token_secret: state.token_secret}
 
     {:noreply, state}
   end
