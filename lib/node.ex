@@ -233,8 +233,8 @@ defmodule Exalia.KNode do
     end
   end
 
-  def handle_info(:rotate_interval, state) do
-    Process.send_after(self(), :rotate_interval, @rotation_interval)
+  def handle_info(:rotate_secret, state) do
+    Process.send_after(self(), :rotate_secret, @rotation_interval)
 
     new_secret = generate_secret()
     state = %{state | token_secret: new_secret, old_token_secret: state.secret}
