@@ -278,7 +278,7 @@ defmodule Exalia.KNode do
   def handle_response(state, :get_peers, response, _address),
     do: ResponseMessage.get_peers(state, response)
 
-  def handle_response(state, :announce_peers, response, _address),
+  def handle_response(state, :announce_peer, response, _address),
     do: ResponseMessage.announce_peer(state, response)
 
   def handle_response(state, _type, _response, {ip, port}) do
@@ -301,6 +301,9 @@ defmodule Exalia.KNode do
 
   def handle_query(state, "get_peers", query, address),
     do: {:noreply, QueryMessage.get_peers(state, query, address)}
+
+  def handle_query(state, "announce_peer", query, address),
+    do: {:noreply, QueryMessage.announce_peer(state, query, address)}
 
   def handle_query(state, type, _, {ip, port}) do
     Logger.warning(

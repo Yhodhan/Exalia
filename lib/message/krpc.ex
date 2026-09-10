@@ -60,14 +60,14 @@ defmodule Exalia.KRPC do
   # -------------------------------
   #            Responses
   # -------------------------------
-  def ping_query(tid, id) do
+  def ping_response(tid, id) do
     id = generate_binary_id(id)
 
     q = %{"t" => tid, "y" => "r", "r" => %{"id" => id}}
     Encoder.encode(q)
   end
 
-  def find_node_query(tid, id, value) do
+  def find_node_response(tid, id, value) do
     id = generate_binary_id(id)
 
     q = %{"t" => tid, "y" => "r", "r" => %{"id" => id, "nodes" => value}}
@@ -75,7 +75,7 @@ defmodule Exalia.KRPC do
     Encoder.encode(q)
   end
 
-  def get_peers_query(tid, id, nodes, token, type) do
+  def get_peers_response(tid, id, nodes, token, type) do
     id = generate_binary_id(id)
 
     q =
@@ -88,6 +88,21 @@ defmodule Exalia.KRPC do
       end
 
     Encoder.encode(q)
+  end
+
+  def announce_peer_response(tid, id) do
+    q = %{"t" => tid, "y" => "r", "r" => %{"id" => id}}
+
+    Encoder.encode(q)
+  end
+
+  # -------------------------------
+  #            Error
+  # -------------------------------
+
+  def error_response(tid, code, description) do
+    e = %{"t" => tid, "y" => "e", "e" => [code, description]}
+    Encoder.encode(e)
   end
 
   # ------------------

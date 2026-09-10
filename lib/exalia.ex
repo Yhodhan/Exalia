@@ -81,7 +81,6 @@ defmodule Exalia do
   def get_contacts(pid),
     do: KNode.contacs(pid)
 
-  @spec node_id(atom() | pid() | {atom(), any()} | {:via, atom(), any()}) :: any()
   def node_id(pid),
     do: KNode.get_node_id(pid)
 
