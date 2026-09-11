@@ -40,6 +40,7 @@ defmodule Message.QueryMessage do
           |> RoutingTable.fetch_candidate(target_id)
           |> encode_candidate()
 
+        IO.inspect(candidate, label: "candidate in response")
         KRPC.find_node_response(tid, own_id, candidate)
       else
         Logger.info("=== FIND NODE REPLY: NODES ===")
@@ -114,9 +115,7 @@ defmodule Message.QueryMessage do
     regen_token = Utils.generate_token(ip, state.token_secret)
     regen_old_token = Utils.generate_token(ip, state.old_token_secret)
 
-    if token == regen_token or token == regen_old_token,
-      do: true,
-      else: false
+    token == regen_token or token == regen_old_token
   end
 
   defp get_port(query, port) do
@@ -128,7 +127,12 @@ defmodule Message.QueryMessage do
 
   defp get_nodes(state, info_hash) do
     if Storage.has_infohash?(info_hash) do
-      {Storage.get_nodes(info_hash), :values}
+      peers =
+        info_hash
+        |> Storage.get_nodes()
+        |> Enum.map(fn p -> encode_peer(p) end)
+
+      {peers, :values}
     else
       nodes =
         state
@@ -151,5 +155,10 @@ defmodule Message.QueryMessage do
   defp encode_candidate(%Candidate{id: id, ip: ip, port: port} = _c) do
     {a, b, c, d} = ip
     <<id::size(160)-big, a, b, c, d, port::size(16)-big>>
+  end
+
+  defp encode_peer(%Candidate{ip: ip, port: port} = _c) do
+    {a, b, c, d} = ip
+    <<a, b, c, d, port::size(16)-big>>
   end
 end
