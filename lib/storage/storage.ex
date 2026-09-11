@@ -19,7 +19,7 @@ defmodule Exalia.Storage do
     do: GenServer.call(__MODULE__, {:get_nodes, infohash})
 
   def has_infohash?(infohash),
-    do: GenServer.call(__MODULE__, {:hash_infohash, infohash})
+    do: GenServer.call(__MODULE__, {:has_infohash, infohash})
 
   # ----------------------
   #  GenServer functions
@@ -32,23 +32,21 @@ defmodule Exalia.Storage do
     do: {:ok, state}
 
   def handle_cast({:store_node, infohash, peer}, state) do
-    state =
-      if Map.has_key?(state, infohash) do
-        nodes = Map.get(state, infohash)
-        nodes = nodes ++ [peer]
-        Map.put(state, infohash, nodes)
-      else
-        Map.put(state, infohash, [peer])
-      end
+    nodes = Map.get(state, infohash, [])
 
-    {:noreply, state}
+    update_nodes =
+      if Enum.any?(state, &(&1.id == peer.id)),
+        do: Enum.map(nodes, fn n -> if n.id == peer.id, do: peer, else: n end),
+        else: [peer | nodes]
+
+    {:noreply, Map.put(state, infohash, update_nodes)}
   end
 
   def handle_call({:get_nodes, infohash}, _from, state) do
-    {:reply, Map.get(state, infohash), state}
+    {:reply, Map.get(state, infohash, []), state}
   end
 
-  def handle_call({:hash_infohash, infohash}, _from, state) do
+  def handle_call({:has_infohash, infohash}, _from, state) do
     {:reply, Map.has_key?(state, infohash), state}
   end
 end

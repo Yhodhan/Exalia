@@ -94,14 +94,14 @@ defmodule Message.QueryMessage do
 
       {:ok, msg} = KRPC.announce_peer_response(tid, state.id)
       # careful: reply to the querier's actual UDP source port, not their announced peer port
-      :gen_udp.send(state.socket, ip, peer_port, msg)
+      :gen_udp.send(state.socket, ip, port, msg)
 
       candidate = Candidate.new(id, ip, peer_port)
       table = RoutingTable.insert(state.routing_table, candidate)
       %{state | routing_table: table}
     else
       {:ok, msg} = KRPC.error_response(tid, 203, "Bad token")
-      :gen_udp.send(state.socket, ip, peer_port, msg)
+      :gen_udp.send(state.socket, ip, port, msg)
       state
     end
   end
