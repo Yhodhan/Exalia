@@ -8,7 +8,7 @@ defmodule Message.QueryMessage do
   require Logger
 
   def ping(state, query, {ip, port}) do
-    Logger.info("=== QUERY RECEIVED: PING ===")
+    Logger.debug("=== QUERY RECEIVED: PING ===")
     tid = query["t"]
     own_id = state.id
 
@@ -24,7 +24,7 @@ defmodule Message.QueryMessage do
   end
 
   def find_node(state, query, {ip, port}) do
-    Logger.info("=== QUERY RECEIVED: FIND NODE ===")
+    Logger.debug("=== QUERY RECEIVED: FIND NODE ===")
     tid = query["t"]
     own_id = state.id
 
@@ -43,12 +43,11 @@ defmodule Message.QueryMessage do
 
         KRPC.find_node_response(tid, own_id, candidate)
       else
-        Logger.info("=== FIND NODE REPLY: NODES ===")
+        Logger.debug("=== FIND NODE REPLY: NODES ===")
 
         nodes =
           state
           |> get_closest_candidates(target_id)
-          |> IO.inspect(label: "nodes in response")
           |> encode_candidates()
 
         KRPC.find_node_response(tid, own_id, nodes)
@@ -59,7 +58,7 @@ defmodule Message.QueryMessage do
   end
 
   def get_peers(state, query, {ip, port}) do
-    Logger.info("=== QUERY RECEIVED: GET PEERS ===")
+    Logger.debug("=== QUERY RECEIVED: GET PEERS ===")
     tid = query["t"]
     own_id = state.id
 
@@ -80,7 +79,7 @@ defmodule Message.QueryMessage do
   end
 
   def announce_peer(state, query, {ip, port}) do
-    Logger.info("=== QUERY RECEIVED: ANNOUNCE PEER ===")
+    Logger.debug("=== QUERY RECEIVED: ANNOUNCE PEER ===")
 
     tid = query["t"]
     peer_port = get_port(query, port)

@@ -9,7 +9,7 @@ defmodule Message.ResponseMessage do
   # ----------------------------------------------------
 
   def ping(state, response, {ip, port}) do
-    Logger.info("=== Ping received ===")
+    Logger.debug("=== Ping received ===")
 
     case response["r"] do
       %{"id" => id} ->
@@ -30,7 +30,7 @@ defmodule Message.ResponseMessage do
   # ----------------------------------------------------
 
   def find_node(state, response) do
-    Logger.info("=== Find Nodes received ===")
+    Logger.debug("=== Find Nodes received ===")
 
     case response["r"] do
       %{"id" => _id, "nodes" => nodes} ->
@@ -59,14 +59,14 @@ defmodule Message.ResponseMessage do
 
     case response["r"] do
       %{"nodes" => nodes} ->
-        Logger.info("=== Get Peers Received: Nodes ===")
+        Logger.debug("=== Get Peers Received: Nodes ===")
 
         {decoded_nodes, table} = fill_routing_table(state, nodes)
 
         {{:nodes, decoded_nodes}, %{state | routing_table: table, tokens: tokens}}
 
       %{"values" => values} ->
-        Logger.info("=== Get Peers Received: Peers ===")
+        Logger.debug("=== Get Peers Received: Peers ===")
 
         peers = Enum.map(values, fn v -> decode_peer(v) end)
 

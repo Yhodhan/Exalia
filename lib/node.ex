@@ -220,7 +220,7 @@ defmodule Exalia.KNode do
   #          Handle Port connection
   # ---------------------------------------
   def handle_info({:udp, _socket, ip, port, data}, state) do
-    Logger.info("=== Response received ===")
+    Logger.debug("=== Response received ===")
 
     result =
       try do
@@ -353,11 +353,13 @@ defmodule Exalia.KNode do
   def handle_query(state, "announce_peer", query, address),
     do: {:noreply, QueryMessage.announce_peer(state, query, address)}
 
-  def handle_query(state, type, _, {ip, port}) do
+  def handle_query(state, type, query, {ip, port}) do
     Logger.warning(
       "=== Unknown Query received : #{inspect(type)} from address: #{inspect(ip)} port: #{inspect(port)}"
     )
 
+    {:ok, msg} = KRPC.error_response(query["t"], 204, "Method Unknown")
+    :gen_udp.send(state.socket, msg)
     {:noreply, state}
   end
 
