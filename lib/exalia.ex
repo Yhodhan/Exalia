@@ -35,11 +35,20 @@ defmodule Exalia do
   #   Main API calls
   # -----------------
 
+  def ping(host, port),
+    do: ping(self(), host, port)
+
   def ping(pid, host, port),
     do: KNode.ping(pid, host, port)
 
+  def find_nodes(contact, target),
+    do: find_nodes(self(), contact, target)
+
   def find_nodes(pid, contact, target),
     do: KNode.find_node(pid, contact, target)
+
+  def get_peers(infohash),
+    do: get_peers(self(), infohash)
 
   def get_peers(pid, infohash) do
     # 4 - join all answers
@@ -54,6 +63,9 @@ defmodule Exalia do
       4
     )
   end
+
+  def announce_peer(infohash, port),
+    do: announce_peer(self(), infohash, port)
 
   def announce_peer(pid, infohash, port) do
     # fetch list of contacts and one by one send the request

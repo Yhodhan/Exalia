@@ -395,7 +395,6 @@ defmodule Exalia.KNode do
   defp analyze_response(data) do
     case data do
       %{"y" => "r"} ->
-        # {:ok, data["t"], data}
         {:ok, :response, data}
 
       %{"y" => "q"} ->
