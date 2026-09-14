@@ -359,7 +359,7 @@ defmodule Exalia.KNode do
     )
 
     {:ok, msg} = KRPC.error_response(query["t"], 204, "Method Unknown")
-    :gen_udp.send(state.socket, msg)
+    :gen_udp.send(state.socket, ip, port, msg)
     {:noreply, state}
   end
 
