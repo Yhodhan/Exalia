@@ -9,9 +9,7 @@ defmodule Exalia do
   @alpha 6
   @k 8
 
-  def bootstrap() do
-    {:ok, pid, id} = new_node()
-
+  def bootstrap(pid, id) do
     # ping initial nodes
     Config.bootstrap_nodes()
     |> Task.async_stream(
