@@ -53,9 +53,9 @@ defmodule Message.ResponseMessage do
     id = Utils.conversion(response["r"]["id"])
 
     tokens =
-      if not is_nil(token) do
-        Map.put(state.tokens, id, token)
-      end
+      if not is_nil(token),
+        do: Map.put(state.tokens, id, token),
+        else: state.tokens
 
     case response["r"] do
       %{"nodes" => nodes} ->
