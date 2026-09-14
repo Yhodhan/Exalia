@@ -112,6 +112,7 @@ defmodule Exalia.KNode do
 
   def init(state) do
     port = Config.dht_port()
+    IO.inspect(port, label: "port")
 
     Process.send_after(self(), :self_lookup, @self_lookup_interval)
     Process.send_after(self(), :rotate_secret, @refresh_secret_interval)
