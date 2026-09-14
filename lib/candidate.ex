@@ -7,5 +7,5 @@ defmodule Exalia.Candidate do
   ]
 
   def new(id, ip, port),
-    do: %__MODULE__{id: id, ip: ip, port: port}
+    do: %__MODULE__{id: id, ip: ip, port: port, last_seen: System.monotonic_time(:millisecond)}
 end

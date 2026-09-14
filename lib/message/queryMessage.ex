@@ -38,9 +38,9 @@ defmodule Message.QueryMessage do
         candidate =
           state.routing_table
           |> RoutingTable.fetch_candidate(target_id)
+          |> IO.inspect(label: "candidate in response")
           |> encode_candidate()
 
-        IO.inspect(candidate, label: "candidate in response")
         KRPC.find_node_response(tid, own_id, candidate)
       else
         Logger.info("=== FIND NODE REPLY: NODES ===")
@@ -48,6 +48,7 @@ defmodule Message.QueryMessage do
         nodes =
           state
           |> get_closest_candidates(target_id)
+          |> IO.inspect(label: "nodes in response")
           |> encode_candidates()
 
         KRPC.find_node_response(tid, own_id, nodes)
@@ -61,8 +62,9 @@ defmodule Message.QueryMessage do
     Logger.info("=== QUERY RECEIVED: GET PEERS ===")
     tid = query["t"]
     own_id = state.id
-    querying_id = :binary.decode_unsigned(query["a"]["id"])
-    info_hash = :binary.decode_unsigned(query["a"]["info_hash"])
+
+    querying_id = Utils.conversion(query["a"]["id"])
+    info_hash = Utils.conversion(query["a"]["info_hash"])
 
     # check if the Node has downloaders
     {nodes, type} = get_nodes(state, info_hash)
@@ -86,8 +88,8 @@ defmodule Message.QueryMessage do
     %{"id" => raw_id, "info_hash" => raw_infohash, "token" => token} =
       query["a"]
 
-    id = :binary.decode_unsigned(raw_id)
-    info_hash = :binary.decode_unsigned(raw_infohash)
+    id = Utils.conversion(raw_id)
+    info_hash = Utils.conversion(raw_infohash)
 
     if valid_token?(state, ip, token) do
       candidate = Candidate.new(id, ip, peer_port)
@@ -111,7 +113,7 @@ defmodule Message.QueryMessage do
   #  Private functions
   # -------------------
 
-  def valid_token?(state, ip, token) do
+  defp valid_token?(state, ip, token) do
     regen_token = Utils.generate_token(ip, state.token_secret)
     regen_old_token = Utils.generate_token(ip, state.old_token_secret)
 
@@ -146,11 +148,11 @@ defmodule Message.QueryMessage do
   defp get_closest_candidates(state, target_id),
     do: RoutingTable.get_closest_candidates(state.routing_table, target_id)
 
-  defp encode_candidates([]), do: <<>>
+  defp encode_candidates([]),
+    do: <<>>
 
-  defp encode_candidates([candidate | rest]) do
-    encode_candidate(candidate) <> encode_candidates(rest)
-  end
+  defp encode_candidates([candidate | rest]),
+    do: encode_candidate(candidate) <> encode_candidates(rest)
 
   defp encode_candidate(%Candidate{id: id, ip: ip, port: port} = _c) do
     {a, b, c, d} = ip

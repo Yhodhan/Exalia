@@ -6,6 +6,7 @@ defmodule Exalia.RoutingTable do
   alias Exalia.Utils
 
   @alpha 8
+  @inactive_interval 15 * 60 * 1000
 
   defstruct [
     :id,
@@ -34,7 +35,7 @@ defmodule Exalia.RoutingTable do
   def fetch_bucket(table, index) do
     table
     |> Map.get(:kbuckets)
-    |> Map.get(index, [])
+    |> Map.get(index, KBucket.new())
   end
 
   def put_bucket(%__MODULE__{} = table, index, bucket) do
@@ -46,16 +47,22 @@ defmodule Exalia.RoutingTable do
     index = bucket_index(distance)
     bucket = fetch_bucket(table, index)
 
-    Enum.find(bucket, fn c -> c.id == id end)
+    Enum.find(bucket.nodes, fn c -> c.id == id end)
   end
 
   def has_candidate?(table, id),
     do: not is_nil(fetch_candidate(table, id))
 
+  def bucket_stale?(bucket),
+    do: System.monotonic_time(:millisecond) - bucket.last_update > @inactive_interval
+
+  def candidate_stale?(%Candidate{last_seen: last_seen} = _c),
+    do: System.monotonic_time(:millisecond) - last_seen > @inactive_interval
+
   def get_closest_candidates(table, id) do
     table.kbuckets
     |> Map.values()
-    |> List.flatten()
+    |> Enum.flat_map(& &1.nodes)
     |> Enum.sort_by(fn c -> Utils.xor_distance(c.id, id) end)
     |> Enum.take(@alpha)
   end

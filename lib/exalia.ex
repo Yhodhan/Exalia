@@ -92,7 +92,7 @@ defmodule Exalia do
   # ---------------------------
 
   def lookup(pid, target) do
-    initial_nodes = closest_nodes(pid, target, @alpha)
+    initial_nodes = RoutingTable.get_closest_candidates(routing_table(pid), target)
     do_lookup(pid, target, initial_nodes, _queried = MapSet.new(), _best = [], _round = 8)
   end
 
@@ -168,17 +168,5 @@ defmodule Exalia do
     if MapSet.size(peers) > 4 or Enum.empty?(pending),
       do: peers,
       else: lookup_peers(pid, infohash, pending, queried, peers, rounds - 1)
-  end
-
-  # -------------------
-  #  Private functions
-  # -------------------
-
-  defp closest_nodes(pid, target, alpha) do
-    routing_table(pid).kbuckets
-    |> Map.values()
-    |> List.flatten()
-    |> Enum.sort_by(fn c -> Utils.xor_distance(c.id, target) end)
-    |> Enum.take(alpha)
   end
 end

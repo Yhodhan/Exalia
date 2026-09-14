@@ -6,13 +6,17 @@ defmodule Exalia.KNode do
   alias Bencoder.Decoder
   alias Message.QueryMessage
   alias Message.ResponseMessage
+  alias Exalia.Utils
 
   use GenServer
   require Logger
 
   @id_size_bytes 20
   @time_out 2_000
-  @rotation_interval 5 * 60 * 1000
+
+  @refresh_interval 2 * 60 * 1000
+  @self_lookup_interval 5 * 60 * 1000
+  @refresh_secret_interval 5 * 60 * 1000
 
   defstruct [
     :routing_table,
@@ -43,16 +47,16 @@ defmodule Exalia.KNode do
     {:ok, pid, id}
   end
 
-  # -------------------
-  #   GenServer calls
-  # -------------------
+  # ---------------------------------------
+  #            GenServer calls
+  # ---------------------------------------
 
   def start_link(state \\ %{}),
     do: GenServer.start_link(__MODULE__, state)
 
-  # -----------------
-  #   Main API calls
-  # -----------------
+  # ---------------------------------------
+  #              Main API calls
+  # ---------------------------------------
 
   def ping(pid, host, port) do
     try do
@@ -86,9 +90,9 @@ defmodule Exalia.KNode do
     end
   end
 
-  # ------------------
-  #  Helper functions
-  # ------------------
+  # ---------------------------------------
+  #             HELPER FUNCTIONS
+  # ---------------------------------------
 
   def contacs(pid),
     do: GenServer.call(pid, :contacts)
@@ -102,14 +106,16 @@ defmodule Exalia.KNode do
   def get_tokens(pid),
     do: GenServer.call(pid, :tokens)
 
-  # ----------------------
-  #  GenServer functions
-  # ----------------------
+  # ---------------------------------------
+  #           GenServer functions
+  # ---------------------------------------
 
   def init(state) do
     port = Config.dht_port()
 
-    Process.send_after(self(), :rotate_secret, @rotation_interval)
+    Process.send_after(self(), :self_lookup, @self_lookup_interval)
+    Process.send_after(self(), :rotate_secret, @refresh_secret_interval)
+    Process.send_after(self(), :refresh_buckets, @refresh_interval)
 
     case :gen_udp.open(port, [:binary, :inet, {:active, true}]) do
       {:ok, socket} ->
@@ -128,9 +134,9 @@ defmodule Exalia.KNode do
     {:reply, contacts, state}
   end
 
-  # -----------------
-  #      PING
-  # -----------------
+  # ---------------------------------------
+  #                   PING
+  # ---------------------------------------
   def handle_call({:ping, host, port}, from, state) do
     tid = transaction_id()
 
@@ -147,9 +153,9 @@ defmodule Exalia.KNode do
     {:noreply, %{state | pending: pending}}
   end
 
-  # -----------------
-  #     FIND NODE
-  # -----------------
+  # ---------------------------------------
+  #                   FIND NODE
+  # ---------------------------------------
   def handle_call({:find_node, contact, target}, from, state) do
     tid = transaction_id()
 
@@ -163,6 +169,9 @@ defmodule Exalia.KNode do
     {:noreply, %{state | pending: pending}}
   end
 
+  # ---------------------------------------
+  #                 GET PEERS
+  # ---------------------------------------
   def handle_call({:get_peers, contact, infohash}, from, state) do
     tid = transaction_id()
 
@@ -176,6 +185,9 @@ defmodule Exalia.KNode do
     {:noreply, %{state | pending: pending}}
   end
 
+  # ---------------------------------------
+  #              ANNOUNCE PEER
+  # ---------------------------------------
   def handle_call({:announce_peer, contact, infohash, port, token}, from, state) do
     tid = transaction_id()
 
@@ -189,9 +201,9 @@ defmodule Exalia.KNode do
     {:noreply, %{state | pending: pending}}
   end
 
-  # ---------------------------
-  #        Getter Functions
-  # ---------------------------
+  # ---------------------------------------
+  #             Getter Functions
+  # ---------------------------------------
   def handle_call(:routing_table, _from, state),
     do: {:reply, state.routing_table, state}
 
@@ -201,10 +213,9 @@ defmodule Exalia.KNode do
   def handle_call(:tokens, _from, state),
     do: {:reply, state.tokens, state}
 
-  # ---------------------------
-  #    Handle Port connection
-  # ---------------------------
-
+  # ---------------------------------------
+  #          Handle Port connection
+  # ---------------------------------------
   def handle_info({:udp, _socket, ip, port, data}, state) do
     Logger.info("=== Response received ===")
 
@@ -233,8 +244,42 @@ defmodule Exalia.KNode do
     end
   end
 
+  # ----------------------------------------------------
+  #                     SELF HEALING
+  # ----------------------------------------------------
+
+  def handle_info(:self_lookup, state) do
+    Logger.info("=== SELF LOOKUP ===")
+    Process.send_after(self(), :self_lookup, @self_lookup_interval)
+
+    pid = self()
+    id = state.id
+    Task.start(fn -> Exalia.lookup(pid, id) end)
+
+    {:noreply, state}
+  end
+
+  def handle_info(:refresh_buckets, state) do
+    Logger.info("=== REFRESH BUCKETS ===")
+    Process.send_after(self(), :refresh_buckets, @refresh_interval)
+
+    pid = self()
+
+    state.routing_table.kbuckets
+    |> Enum.each(fn {index, bucket} ->
+      if RoutingTable.bucket_stale?(bucket) do
+        Logger.info("=== REFRESH BUCKET: #{index}")
+        target = Utils.random_id_bucket(state.id, index)
+        Task.start(fn -> Exalia.lookup(pid, target) end)
+      end
+    end)
+
+    {:noreply, state}
+  end
+
   def handle_info(:rotate_secret, state) do
-    Process.send_after(self(), :rotate_secret, @rotation_interval)
+    Logger.info("=== REFRESH TOKEN ===")
+    Process.send_after(self(), :rotate_secret, @refresh_secret_interval)
 
     new_secret = generate_secret()
     state = %{state | token_secret: new_secret, old_token_secret: state.token_secret}
