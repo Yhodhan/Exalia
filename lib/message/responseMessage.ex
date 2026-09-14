@@ -1,6 +1,7 @@
 defmodule Message.ResponseMessage do
   alias Exalia.RoutingTable
   alias Exalia.Candidate
+  alias Exalia.Utils
 
   require Logger
   # ----------------------------------------------------
@@ -48,20 +49,24 @@ defmodule Message.ResponseMessage do
   # ----------------------------------------------------
 
   def get_peers(state, response) do
+    token = response["r"]["token"]
+    id = Utils.conversion(response["r"]["id"])
+
+    tokens =
+      if not is_nil(token) do
+        Map.put(state.tokens, id, token)
+      end
+
     case response["r"] do
-      %{"id" => id, "token" => token, "nodes" => nodes} ->
+      %{"nodes" => nodes} ->
         Logger.info("=== Get Peers Received: Nodes ===")
-        id = :binary.decode_unsigned(id)
-        tokens = Map.put(state.tokens, id, token)
 
         {decoded_nodes, table} = fill_routing_table(state, nodes)
 
         {{:nodes, decoded_nodes}, %{state | routing_table: table, tokens: tokens}}
 
-      %{"id" => id, "token" => token, "values" => values} ->
+      %{"values" => values} ->
         Logger.info("=== Get Peers Received: Peers ===")
-        id = :binary.decode_unsigned(id)
-        tokens = Map.put(state.tokens, id, token)
 
         peers = Enum.map(values, fn v -> decode_peer(v) end)
 
