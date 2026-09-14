@@ -70,7 +70,7 @@ defmodule Exalia.RoutingTable do
   def get_contacts(table) do
     table.kbuckets
     |> Map.values()
-    |> List.flatten()
+    |> Enum.flat_map(& &1.nodes)
   end
 
   # ------------------
