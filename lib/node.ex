@@ -112,7 +112,6 @@ defmodule Exalia.KNode do
 
   def init(state) do
     port = Config.dht_port()
-    IO.inspect(port, label: "port")
 
     Process.send_after(self(), :self_lookup, @self_lookup_interval)
     Process.send_after(self(), :rotate_secret, @refresh_secret_interval)
@@ -122,10 +121,13 @@ defmodule Exalia.KNode do
       {:ok, socket} ->
         {:ok, %{state | socket: socket, pending: %{}}}
 
-      {:error, :eaddriuse} ->
+      {:error, :eaddrinuse} ->
         Logger.warning("Port #{port} in use, falling back to random port")
         {:ok, socket} = :gen_udp.open(0, [:binary, :inet, {:active, true}])
         {:ok, %{state | socket: socket, pending: %{}}}
+
+      {:error, reason} ->
+        {:stop, reason}
     end
   end
 
