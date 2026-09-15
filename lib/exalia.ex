@@ -103,7 +103,7 @@ defmodule Exalia do
 
   def lookup(pid, target) do
     initial_nodes = RoutingTable.get_closest_candidates(routing_table(pid), target)
-    do_lookup(pid, target, initial_nodes, _queried = MapSet.new(), _best = [], _round = 8)
+    do_lookup(pid, target, initial_nodes, _queried = MapSet.new(), _best = [], _round = 2)
   end
 
   def do_lookup(_pid, _target, _to_query, _queried, best, 0), do: best
