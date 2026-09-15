@@ -9,8 +9,6 @@ defmodule Message.ResponseMessage do
   # ----------------------------------------------------
 
   def ping(state, response, {ip, port}) do
-    Logger.debug("=== Ping received ===")
-
     case response["r"] do
       %{"id" => id} ->
         id = :binary.decode_unsigned(id)
@@ -30,8 +28,6 @@ defmodule Message.ResponseMessage do
   # ----------------------------------------------------
 
   def find_node(state, response) do
-    Logger.debug("=== Find Nodes received ===")
-
     case response["r"] do
       %{"id" => _id, "nodes" => nodes} ->
         {decoded_nodes, table} = fill_routing_table(state, nodes)
@@ -59,15 +55,11 @@ defmodule Message.ResponseMessage do
 
     case response["r"] do
       %{"nodes" => nodes} ->
-        Logger.debug("=== Get Peers Received: Nodes ===")
-
         {decoded_nodes, table} = fill_routing_table(state, nodes)
 
         {{:nodes, decoded_nodes}, %{state | routing_table: table, tokens: tokens}}
 
       %{"values" => values} ->
-        Logger.debug("=== Get Peers Received: Peers ===")
-
         peers = Enum.map(values, fn v -> decode_peer(v) end)
 
         {{:peers, peers}, %{state | tokens: tokens}}

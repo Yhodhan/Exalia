@@ -150,8 +150,6 @@ defmodule Exalia.KNode do
 
     Process.send_after(self(), {:request_timeout, tid}, @time_out)
 
-    Logger.info("=== Ping Request sent ===")
-
     pending = Map.put(state.pending, tid, {from, :ping})
     {:noreply, %{state | pending: pending}}
   end
@@ -166,8 +164,6 @@ defmodule Exalia.KNode do
 
     :gen_udp.send(state.socket, contact.ip, contact.port, msg)
 
-    Logger.info("=== Find Node Request Sent ===")
-
     pending = Map.put(state.pending, tid, {from, :find_node})
     {:noreply, %{state | pending: pending}}
   end
@@ -181,8 +177,6 @@ defmodule Exalia.KNode do
     {:ok, msg} = KRPC.get_peers(tid, state.id, infohash)
 
     :gen_udp.send(state.socket, contact.ip, contact.port, msg)
-
-    Logger.info("=== Get Peers Request Sent ===")
 
     pending = Map.put(state.pending, tid, {from, :get_peers})
     {:noreply, %{state | pending: pending}}
@@ -220,8 +214,6 @@ defmodule Exalia.KNode do
   #          Handle Port connection
   # ---------------------------------------
   def handle_info({:udp, _socket, ip, port, data}, state) do
-    Logger.debug("=== Response received ===")
-
     result =
       try do
         Decoder.decode(data)
