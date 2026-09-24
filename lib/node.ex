@@ -192,8 +192,6 @@ defmodule Exalia.KNode do
 
     :gen_udp.send(state.socket, contact.ip, contact.port, msg)
 
-    Logger.info("=== Announce Peer Sent ===")
-
     pending = Map.put(state.pending, tid, {from, :announce_peer})
     {:noreply, %{state | pending: pending}}
   end
@@ -228,6 +226,7 @@ defmodule Exalia.KNode do
           process_response(data, state, {ip, port})
 
         :query ->
+          Logger.info("=== QUERY ARRIVED OF TYPE: #{inspect(data["q"])} ===")
           handle_query(state, data["q"], data, {ip, port})
 
         :error ->
@@ -300,6 +299,7 @@ defmodule Exalia.KNode do
   def process_response(data, state, {ip, port}) do
     case fetch_tx(data["t"], state) do
       {:ok, {from, type}, pending} ->
+        Logger.info("=== RESPONSE ARRIVED OF TYPE #{inspect(type)} ===")
         {response, state} = handle_response(state, type, data, {ip, port})
         GenServer.reply(from, response)
         {:noreply, %{state | pending: pending}}

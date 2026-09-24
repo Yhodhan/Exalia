@@ -5,8 +5,6 @@ defmodule Message.QueryMessage do
   alias Exalia.Utils
   alias Exalia.Storage
 
-  require Logger
-
   def ping(state, query, {ip, port}) do
     tid = query["t"]
     own_id = state.id
