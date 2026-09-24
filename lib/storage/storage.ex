@@ -35,7 +35,7 @@ defmodule Exalia.Storage do
     nodes = Map.get(state, infohash, [])
 
     update_nodes =
-      if Enum.any?(state, &(&1.id == peer.id)),
+      if Enum.any?(nodes, fn n -> n.id == peer.id end),
         do: Enum.map(nodes, fn n -> if n.id == peer.id, do: peer, else: n end),
         else: [peer | nodes]
 
